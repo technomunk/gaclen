@@ -8,4 +8,6 @@ edition = "2018"
 
 [dependencies]
 winit = "0.19.*" # window handling
-vulkano = "0.13.*" # vulkan library in Rust
+vulkano = "0.14.*" # vulkan library in Rust
+vulkano-win = "0.14.*" # vulkan-winit linkage
+cgmath = "0.17.*" # linear algebra library

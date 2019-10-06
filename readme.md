@@ -9,7 +9,6 @@ A full-stack 3D game client engine in [Rust](https://www.rust-lang.org).
 - [ ] Semi-transparent object rendering
 - [ ] Text rendering
 - [ ] Extended debug information and pipeline
-- [ ] Networking
 - [ ] Forward kinematics
 - [ ] Shadows
 - [ ] Water effects

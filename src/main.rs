@@ -2,6 +2,7 @@
 // It is used to manually test the functionality of the engine
 
 mod graphics;
+mod window;
 
 use winit::{
 	WindowBuilder,
@@ -18,9 +19,7 @@ fn main() {
 		.build(&events_loop).unwrap();
 	
 	let context = graphics::context::Context::new().unwrap();
-	let device = graphics::device::Device::new(&context).unwrap();
-
-	// let surface = vulkano_win::create_vk_surface(window, vulkan_instance).unwrap();
+	let device = graphics::device::Device::new(&context, &window).unwrap();
 
 	let mut running = true;
 	while running {

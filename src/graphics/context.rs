@@ -1,5 +1,3 @@
-use vulkano_win;
-
 use std::sync::Arc;
 
 // A Vulkan driver-talking context instance.
@@ -18,8 +16,4 @@ impl Context {
 		Ok(context)
 	}
 	// TODO: add a version with custom extensions
-}
-
-impl Context {
-
 }

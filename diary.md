@@ -8,7 +8,7 @@ Decided to name it **gaclen**, short for "Game Client Engine", as it is planned 
 
 ## 12-10-2019
 
-Greg worked mode on the project.
+Greg worked more on the project.
 
 - Created graphics module with context and device submodules.
 - Created initializeable graphics::context::Context object, an instance of Vulkan-driver context.

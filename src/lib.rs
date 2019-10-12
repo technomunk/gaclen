@@ -3,6 +3,8 @@ extern crate vulkano;
 extern crate vulkano_win;
 extern crate cgmath;
 
+pub mod graphics;
+
 #[cfg(test)]
 mod tests {
 #[test]

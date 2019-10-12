@@ -4,7 +4,7 @@
 
 Greg Created the project.
 
-Decided to name it **gaclen**, short for "Game Client Engine", as it is planned to be used exclusively by the clients (and tools) and not servers.
+Decided to name it **gaclen**, short for **Ga**me **Cl**ient **En**gine, as it is planned to be used exclusively by the clients (and tools) and not servers.
 
 ## 12-10-2019
 

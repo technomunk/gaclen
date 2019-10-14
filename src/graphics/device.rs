@@ -14,7 +14,7 @@ use crate::window::Window;
 
 type ImageFormat = (vulkano::format::Format, vulkano::swapchain::ColorSpace);
 
-// A graphical device responsible for using hardware acceleration. 
+// A graphical device responsible for using hardware acceleration.
 pub struct Device<W> {
 	device: Arc<LogicalDevice>,
 
@@ -68,6 +68,7 @@ impl<W> Device<W> {
 			swapchain,
 			swapchain_images,
 		};
+
 		Ok(device)
 	}
 }
@@ -144,10 +145,14 @@ fn select_format(formats: Vec<ImageFormat>) -> Result<ImageFormat, DeviceCreatio
 	}
 
 	for other in formats {
-		if cfg!(debug_assertions) { print_image_format(&format, "  "); }
+		if cfg!(debug_assertions) { print_image_format(&other, "  "); }
 		format = choose_better_format(format, other);
 	}
 
+	if cfg!(debug_assertions) {
+		println!();
+		print_image_format(&format, "Chosen format: ");
+	}
 	Ok(format)
 }
 

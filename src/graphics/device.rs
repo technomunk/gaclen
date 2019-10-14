@@ -48,10 +48,8 @@ impl<W> Device<W> {
 
 		let device_extensions = DeviceExtensions { khr_swapchain: true, .. DeviceExtensions::none() };
 		let queues = select_queue_families(&physical);
-		let (logical, mut queues) = LogicalDevice::new(physical, physical.supported_features(), &device_extensions, queues.iter().cloned())?;
-		let graphics_queue = queues.next().unwrap();
-		let transfer_queue = queues.next().unwrap();
-		let compute_queue = queues.next().unwrap();
+		let (logical, queues) = LogicalDevice::new(physical, physical.supported_features(), &device_extensions, queues.iter().cloned())?;
+		let [graphics_queue, transfer_queue, compute_queue] = unpack_queues(queues.collect());
 
 		let dimensions = match window.borrow().get_inner_size() {
 			Some(size) => size,
@@ -81,6 +79,25 @@ impl From<vulkano::swapchain::SurfaceCreationError> for DeviceCreationError {
 	fn from(error: vulkano::swapchain::SurfaceCreationError) -> DeviceCreationError { DeviceCreationError::Surface(error) }
 }
 
+impl<W> std::fmt::Debug for Device<W> {
+	fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+		writeln!(fmt, "{{")?;
+		let physical_device = self.device.physical_device();
+		writeln!(fmt, "  name: {}", physical_device.name())?;
+		writeln!(fmt, "  type: {:?}", physical_device.ty())?;
+		writeln!(fmt, "  graphics_queue:")?;
+		write_queue_details(fmt, &self.graphics_queue, "    ")?;
+		writeln!(fmt)?;
+		writeln!(fmt, "  transfer_queue:")?;
+		write_queue_details(fmt, &self.transfer_queue, "    ")?;
+		writeln!(fmt)?;
+		writeln!(fmt, "  compute_queue:")?;
+		write_queue_details(fmt, &self.compute_queue, "    ")?;
+		write!(fmt, "}}")?;
+		Ok(())
+	}
+}
+
 
 fn select_physical_device(context: &Context) -> Result<PhysicalDevice, DeviceCreationError> {
 	let mut devices = PhysicalDevice::enumerate(&context.instance);
@@ -91,7 +108,7 @@ fn select_physical_device(context: &Context) -> Result<PhysicalDevice, DeviceCre
 
 	for other in devices { device = choose_better_device(device, other); };
 	
-	match physical_device_is_compatible(&device) {
+	match validate_physical_device(&device) {
 		true => Ok(device),
 		false => Err(DeviceCreationError::NoCompatiblePhysicalDeviceFound),
 	}
@@ -140,42 +157,13 @@ fn select_format(formats: Vec<ImageFormat>) -> Result<ImageFormat, DeviceCreatio
 
 	let mut format = formats[0];
 
-	if cfg!(debug_assertions) {
-		println!("Choosing format:");
-	}
-
 	for other in formats {
-		if cfg!(debug_assertions) { print_image_format(&other, "  "); }
 		format = choose_better_format(format, other);
-	}
-
-	if cfg!(debug_assertions) {
-		println!();
-		print_image_format(&format, "Chosen format: ");
 	}
 	Ok(format)
 }
 
-fn physical_device_is_compatible<'a>(device: &PhysicalDevice<'a>) -> bool {
-	if cfg!(debug_assertions) {
-		println!("Validating device:");
-		print_physical_device_details(device, "  ", "    ");
-	}
-
-	if device.api_version() < super::REQUIRED_VULKAN_VERSION { return false; }
-
-	let mut supports_graphics = false;
-	let mut supports_compute = false;
-
-	for family in device.queue_families() {
-		supports_graphics = supports_graphics || (family.queues_count() > 0 && family.supports_graphics());
-		supports_compute = supports_compute || (family.queues_count() > 0 && family.supports_compute());
-	};
-
-	supports_compute && supports_graphics
-}
-
-fn select_queue_families<'a>(device: &PhysicalDevice<'a>) -> [(vulkano::instance::QueueFamily<'a>, f32); 3] {
+fn select_queue_families<'a>(device: &PhysicalDevice<'a>) -> Vec<(vulkano::instance::QueueFamily<'a>, f32)> {
 	let mut families = device.queue_families();
 	let first = families.next().unwrap();
 
@@ -189,31 +177,59 @@ fn select_queue_families<'a>(device: &PhysicalDevice<'a>) -> [(vulkano::instance
 		compute = choose_better_compute_family(compute, other);
 	};
 
-	if cfg!(debug_assertions) {
-		println!("Selected queue families:");
-		println!("Graphics:");
-		print_queue_family_details(&graphics, "  ");
-		println!("Transfer:");
-		print_queue_family_details(&transfer, "  ");
-		println!("Compute:");
-		print_queue_family_details(&compute, "  ");
-	}
+	// Hacky cast abuse, append if the queues_count is larger than number of collisions
+	let append_transfer = transfer.queues_count() > (transfer.id() == graphics.id()) as usize;
+	let append_compute = compute.queues_count() > (compute.id() == graphics.id() || compute.id() == transfer.id()) as usize + append_transfer as usize;
 
-	[
-		(graphics, 1.0),
-		(transfer, 0.5),
-		(compute, 0.25),
-	]
+	let mut result = Vec::new();
+	result.push((graphics, 1.0));
+	if append_transfer { result.push((transfer, 0.5)); }
+	if append_compute { result.push((compute, 0.25)); }
+
+	result
+}
+
+fn unpack_queues(mut queues: Vec<Arc<DeviceQueue>>) -> [Arc<DeviceQueue>; 3] {
+	match queues.len() {
+		1 => {
+			let q = queues.pop().unwrap();
+			[q.clone(), q.clone(), q]
+		},
+		// TODO: implement unpacking 2 queues
+		2 => panic!("Unimplemented unpack_queues for just 2 queues, bug Griffone!"),
+		3 => {
+			// TODO: make sure the queues are able to do the thing they were supposed to!
+			let compute = queues.pop().unwrap();
+			let transfer = queues.pop().unwrap();
+			let graphics = queues.pop().unwrap();
+			[graphics, transfer, compute]
+		},
+		_ => panic!("Unexpected number of queues created, something wend wrong during device initialization.")
+	}
+}
+
+fn validate_physical_device<'a>(device: &PhysicalDevice<'a>) -> bool {
+	if device.api_version() < super::REQUIRED_VULKAN_VERSION { return false; }
+
+	let mut supports_graphics = false;
+	let mut supports_compute = false;
+
+	for family in device.queue_families() {
+		supports_graphics = supports_graphics || (family.queues_count() > 0 && family.supports_graphics());
+		supports_compute = supports_compute || (family.queues_count() > 0 && family.supports_compute());
+	};
+
+	supports_compute && supports_graphics
 }
 
 fn choose_better_device<'a>(first: PhysicalDevice<'a>, second: PhysicalDevice<'a>) -> PhysicalDevice<'a> {
-	if !physical_device_is_compatible(&second) { return first; };
+	if !validate_physical_device(&second) { return first; };
 
 	// TODO: compare and select best device
 	first
 }
 
-fn choose_better_format(first: ImageFormat, second: ImageFormat) -> ImageFormat {
+fn choose_better_format(first: ImageFormat, _second: ImageFormat) -> ImageFormat {
 	// TODO: compare and select better format
 	first
 }
@@ -252,27 +268,11 @@ fn choose_better_compute_family<'a>(first: vulkano::instance::QueueFamily<'a>, s
 	}
 }
 
-fn print_physical_device_details<'a>(device: &PhysicalDevice<'a>, prefix: &str, queue_family_prefix: &str) {
-	println!("{}name: {}", prefix, device.name());
-	println!("{}type: {:?}", prefix, device.ty());
-	println!("{}api version: {}", prefix, device.api_version());
-	println!("{}driver version: {}", prefix, device.driver_version());
-	println!("{}memory types count: {}", prefix, device.memory_types().count());
-	println!("{}queue families ({}):", prefix, device.queue_families().count());
-	for family in device.queue_families() {
-		print_queue_family_details(&family, queue_family_prefix);
-		println!();
-	}
-}
-
-fn print_queue_family_details<'a>(family: &vulkano::instance::QueueFamily<'a>, prefix: &str) {
-	println!("{}id: {}", prefix, family.id());
-	println!("{}count: {}", prefix, family.queues_count());
-	println!("{}graphics: {}", prefix, family.supports_graphics());
-	println!("{}compute: {}", prefix, family.supports_compute());
-	println!("{}transfer: {}", prefix, family.explicitly_supports_transfers());
-}
-
-fn print_image_format(format: &ImageFormat, prefix: &str) {
-	println!("{}format: {:?}, color space: {:?}", prefix, format.0, format.1);
+fn write_queue_details(fmt: &mut std::fmt::Formatter, queue: &DeviceQueue, prefix: &str) -> std::fmt::Result {
+	let family = queue.family();
+	writeln!(fmt, "{}id: {}-{}", prefix, family.id(), queue.id_within_family())?;
+	writeln!(fmt, "{}graphics: {}", prefix, family.supports_graphics())?;
+	writeln!(fmt, "{}transfer: {}", prefix, family.explicitly_supports_transfers())?;
+	writeln!(fmt, "{}compute: {}", prefix, family.supports_compute())?;
+	Ok(())
 }

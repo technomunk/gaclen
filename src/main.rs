@@ -20,6 +20,7 @@ fn main() {
 	
 	let context = graphics::context::Context::new().unwrap();
 	let device = graphics::device::Device::new(&context, &window).unwrap();
+	println!("Initialized device: {:?}", device);
 
 	let mut running = true;
 	while running {

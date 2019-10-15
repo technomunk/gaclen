@@ -22,6 +22,13 @@ fn main() {
 	let device = graphics::device::Device::new(&context, &window).unwrap();
 	println!("Initialized device: {:?}", device);
 
+	let graphics_pipeline = graphics::pipeline::basic_draw_pipeline(&device);
+
+	// TODO: create framebuffers
+	// TODO: acquire next frame
+	// TODO: build command buffers for drawing
+	// TODO: present
+
 	let mut running = true;
 	while running {
 		events_loop.poll_events(|event| {

@@ -16,14 +16,14 @@ type ImageFormat = (vulkano::format::Format, vulkano::swapchain::ColorSpace);
 
 // A graphical device responsible for using hardware acceleration.
 pub struct Device<W> {
-	device: Arc<LogicalDevice>,
+	pub(super) device: Arc<LogicalDevice>,
 
-	graphics_queue: Arc<DeviceQueue>,
-	transfer_queue: Arc<DeviceQueue>,
-	compute_queue: Arc<DeviceQueue>,
+	pub(super) graphics_queue: Arc<DeviceQueue>,
+	pub(super) transfer_queue: Arc<DeviceQueue>,
+	pub(super) compute_queue: Arc<DeviceQueue>,
 
-	swapchain: Arc<Swapchain<W>>,
-	swapchain_images: Vec<Arc<SwapchainImage<W>>>,
+	pub(super) swapchain: Arc<Swapchain<W>>,
+	pub(super) swapchain_images: Vec<Arc<SwapchainImage<W>>>,
 }
 
 

@@ -10,4 +10,5 @@ edition = "2018"
 winit = "0.19.*" # window handling
 vulkano = "0.14.*" # vulkan library in Rust
 vulkano-win = "0.14.*" # vulkan-winit linkage
+vulkano-shaders = "0.14.*" # inline shader library
 cgmath = "0.17.*" # linear algebra library

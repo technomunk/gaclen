@@ -2,6 +2,12 @@
 
 A full-stack 3D game client engine in [Rust](https://www.rust-lang.org).
 
+## Setup
+
+1. Clone this repo.
+2. Use cargo to manage the project.
+3. [vulkano-shaders](https://github.com/vulkano-rs/vulkano#setup) requires additional steps, please follow them.
+
 ## Supported features
 
 - [ ] Unlit 3D object rendering

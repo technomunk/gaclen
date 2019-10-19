@@ -1,29 +1,30 @@
+use crate::window::Window;
+use super::context::Context;
+use super::ResizeError;
+use super::pipeline::Pass;
+
 use std::sync::Arc;
 
 use vulkano::instance::PhysicalDevice;
-use vulkano::device::Device as LogicalDevice;
-use vulkano::device::DeviceExtensions;
-use vulkano::device::Queue as DeviceQueue;
-use vulkano::swapchain::{Surface, Swapchain};
+use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
+use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError, PresentFuture};
 use vulkano::image::SwapchainImage;
-
-use super::context::Context;
-
-use crate::window::Window;
+use vulkano::sync::{GpuFuture, FenceSignalFuture, FlushError};
+use vulkano::command_buffer::{CommandBuffer, CommandBufferExecError, CommandBufferExecFuture};
 
 
 type ImageFormat = (vulkano::format::Format, vulkano::swapchain::ColorSpace);
 
 // A graphical device responsible for using hardware acceleration.
-pub struct Device<W> {
+pub struct Device {
 	pub(super) device: Arc<LogicalDevice>,
 
 	pub(super) graphics_queue: Arc<DeviceQueue>,
 	pub(super) transfer_queue: Arc<DeviceQueue>,
 	pub(super) compute_queue: Arc<DeviceQueue>,
 
-	pub(super) swapchain: Arc<Swapchain<W>>,
-	pub(super) swapchain_images: Vec<Arc<SwapchainImage<W>>>,
+	pub(super) swapchain: Arc<Swapchain<Arc<Window>>>,
+	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
 }
 
 
@@ -34,16 +35,13 @@ pub enum DeviceCreationError {
 	Logical(vulkano::device::DeviceCreationError), // Error during the creation of logical device
 	Surface(vulkano::swapchain::SurfaceCreationError), // Error during the creation of the draw surface
 	SurfaceCapabilities(vulkano::swapchain::CapabilitiesError), // Error querying draw surface capabilities
-	Swapchain(vulkano::swapchain::SwapchainCreationError), // Error during the creation of the swapchain
+	Swapchain(SwapchainCreationError), // Error during the creation of the swapchain
 	NoCompatibleFormatFound, // No compatible format for window draw surface was found
 	UnsizedWindow, // Window has no inner size
 }
 
-
-impl<W> Device<W> {
-	pub fn new(context: &Context, window: W) -> Result<Device<W>, DeviceCreationError>
-	where W : vulkano_win::SafeBorrow<Window>
-	{
+impl Device {
+	pub fn new(context: &Context, window: Arc<Window>) -> Result<Device, DeviceCreationError> {
 		let physical = select_physical_device(context)?;
 
 		let device_extensions = DeviceExtensions { khr_swapchain: true, .. DeviceExtensions::none() };
@@ -51,7 +49,7 @@ impl<W> Device<W> {
 		let (logical, queues) = LogicalDevice::new(physical, physical.supported_features(), &device_extensions, queues.iter().cloned())?;
 		let [graphics_queue, transfer_queue, compute_queue] = unpack_queues(queues.collect());
 
-		let dimensions = match window.borrow().get_inner_size() {
+		let dimensions = match window.get_inner_size() {
 			Some(size) => size,
 			None => return Err(DeviceCreationError::UnsizedWindow),
 		};
@@ -69,17 +67,74 @@ impl<W> Device<W> {
 
 		Ok(device)
 	}
+
+	pub fn window_resized(&mut self, window: &Window) -> Result<(), ResizeError> {
+		let dimensions: (u32, u32) = match window.get_inner_size() {
+			Some(size) => size.into(),
+			None => return Err(ResizeError::UnsizedWindow),
+		};
+
+		let (swapchain, images) = self.swapchain.recreate_with_dimension([dimensions.0, dimensions.1])?;
+		self.swapchain = swapchain;
+		self.swapchain_images = images;
+		Ok(())
+	}
+
+	pub fn get_frame_end(&self) -> Box<dyn GpuFuture> {
+		Box::new(vulkano::sync::now(self.device.clone()))
+	}
+
+	pub fn acquire_next_image(&self) -> Result<(usize, vulkano::swapchain::SwapchainAcquireFuture<Arc<Window>>), vulkano::swapchain::AcquireError> {
+		vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None)
+	}
+
+	// TODO: cleanup this
+	pub fn build_draw_command_buffer(
+		&self,
+		pass: &Pass,
+		vertex_buffer: &Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>)
+	-> Result<(vulkano::command_buffer::AutoCommandBuffer, vulkano::swapchain::SwapchainAcquireFuture<Arc<Window>>, usize), ()> {
+		let (image_num, acquire_future) = self.acquire_next_image().unwrap();
+		let clear_values = vec!([0.0, 0.0, 0.0, 1.0].into());
+		let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap()
+			.begin_render_pass(pass.framebuffers[image_num].clone(), false, clear_values).unwrap()
+			.draw(pass.graphics_pipeline.clone(), &pass.dynamic_state, vertex_buffer.clone(), (), ()).unwrap()
+			.end_render_pass().unwrap()
+			.build().unwrap();
+		Ok((command_buffer, acquire_future, image_num))
+	}
+
+	pub fn execute_after<F, C>(&self, future: F, commands: C)
+	-> Result<CommandBufferExecFuture<F, C>, CommandBufferExecError>
+	where
+		F: GpuFuture,
+		C: CommandBuffer + 'static
+	{
+		future.then_execute(self.graphics_queue.clone(), commands)
+	}
+
+	pub fn present_after<F>(&self, future: F, image_index: usize) -> PresentFuture<F, Arc<Window>>
+	where F: GpuFuture
+	{
+		future.then_swapchain_present(self.graphics_queue.clone(), self.swapchain.clone(), image_index)
+	}
+
+	pub fn flush_after<F>(&self, future: F) -> Result<FenceSignalFuture<F>, FlushError>
+	where F: GpuFuture
+	{
+		future.then_signal_fence_and_flush()
+	}
 }
 
 
 impl From<vulkano::device::DeviceCreationError> for DeviceCreationError {
-	fn from(error: vulkano::device::DeviceCreationError) -> DeviceCreationError { DeviceCreationError::Logical(error) }
+	fn from(err: vulkano::device::DeviceCreationError) -> DeviceCreationError { DeviceCreationError::Logical(err) }
 }
 impl From<vulkano::swapchain::SurfaceCreationError> for DeviceCreationError {
-	fn from(error: vulkano::swapchain::SurfaceCreationError) -> DeviceCreationError { DeviceCreationError::Surface(error) }
+	fn from(err: vulkano::swapchain::SurfaceCreationError) -> DeviceCreationError { DeviceCreationError::Surface(err) }
 }
 
-impl<W> std::fmt::Debug for Device<W> {
+impl std::fmt::Debug for Device {
 	fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
 		writeln!(fmt, "{{")?;
 		let physical_device = self.device.physical_device();
@@ -114,14 +169,13 @@ fn select_physical_device(context: &Context) -> Result<PhysicalDevice, DeviceCre
 	}
 }
 
-fn create_swapchain<W>(
+fn create_swapchain(
 	physical_device: PhysicalDevice,
 	logical_device: Arc<LogicalDevice>,
-	surface: Arc<Surface<W>>,
+	surface: Arc<Surface<Arc<Window>>>,
 	dimensions: (u32, u32),
 	graphics_queue: &Arc<DeviceQueue>
-) -> Result<(Arc<Swapchain<W>>, Vec<Arc<SwapchainImage<W>>>), DeviceCreationError>
-{
+) -> Result<(Arc<Swapchain<Arc<Window>>>, Vec<Arc<SwapchainImage<Arc<Window>>>>), DeviceCreationError> {
 	let capabilities = match surface.capabilities(physical_device) {
 		Ok(caps) => caps,
 		Err(err) => return Err(DeviceCreationError::SurfaceCapabilities(err)),

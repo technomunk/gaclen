@@ -89,16 +89,17 @@ impl Device {
 	}
 
 	// TODO: cleanup this
-	pub fn build_draw_command_buffer(
+	pub fn build_draw_command_buffer<PC>(
 		&self,
 		pass: &Pass,
-		vertex_buffer: &Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>)
-	-> Result<(vulkano::command_buffer::AutoCommandBuffer, vulkano::swapchain::SwapchainAcquireFuture<Arc<Window>>, usize), ()> {
+		vertex_buffer: &Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
+		clear_color: [f32; 4],
+		push_constants: PC
+	) -> Result<(vulkano::command_buffer::AutoCommandBuffer, vulkano::swapchain::SwapchainAcquireFuture<Arc<Window>>, usize), ()> {
 		let (image_num, acquire_future) = self.acquire_next_image().unwrap();
-		let clear_values = vec!([0.0, 0.0, 0.0, 1.0].into());
 		let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap()
-			.begin_render_pass(pass.framebuffers[image_num].clone(), false, clear_values).unwrap()
-			.draw(pass.graphics_pipeline.clone(), &pass.dynamic_state, vertex_buffer.clone(), (), ()).unwrap()
+			.begin_render_pass(pass.framebuffers[image_num].clone(), false, vec!(clear_color.into())).unwrap()
+			.draw(pass.graphics_pipeline.clone(), &pass.dynamic_state, vertex_buffer.clone(), (), push_constants).unwrap()
 			.end_render_pass().unwrap()
 			.build().unwrap();
 		Ok((command_buffer, acquire_future, image_num))

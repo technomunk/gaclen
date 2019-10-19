@@ -19,10 +19,10 @@ fn main() {
 	let mut events_loop = EventsLoop::new();
 	let window = std::sync::Arc::new(
 		WindowBuilder::new()
-		.with_title("gaclen")
-		.with_dimensions((1280, 720).into())
-		// .with_resizable(false)
-		.build(&events_loop).unwrap()
+			.with_title("gaclen")
+			.with_dimensions((1280, 720).into())
+			.with_min_dimensions((1280, 720).into())
+			.build(&events_loop).unwrap()
 	);
 	
 	let context = graphics::context::Context::new().unwrap();
@@ -47,7 +47,8 @@ fn main() {
 		}
 
 		let buffers = vec!(triangle_buffer.clone());
-		let (commands, acquire_future, image_num) = device.build_draw_command_buffer(&pass, &buffers).unwrap();
+		let clear_color = [0.0, 0.0, 0.0, 1.0];
+		let (commands, acquire_future, image_num) = device.build_draw_command_buffer(&pass, &buffers, clear_color, push_constants_from_time(start_time.elapsed().as_secs_f64())).unwrap();
 
 		let prev = previous_frame_end.take();
 		let after_commands_built = prev.unwrap().join(acquire_future);
@@ -83,4 +84,13 @@ fn main() {
 	let fps: f64 = frame_count as f64 / run_duration;
 
 	println!("Produced {} frames over {:.2} seconds ({:.2} avg fps)", frame_count, run_duration, fps);
+}
+
+fn push_constants_from_time(time: f64) -> graphics::shader::vertex::ty::PushConstantData {
+	let color = (time.sin() * 0.5 + 0.5) as f32;
+	let rotation = time as f32 % (2.0 * std::f32::consts::PI);
+	
+	graphics::shader::vertex::ty::PushConstantData {
+		color_rotation: [1.0, color, 0.0, rotation].into(),
+	}
 }

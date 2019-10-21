@@ -80,15 +80,18 @@ impl Device {
 		Ok(())
 	}
 
-	pub fn get_frame_end(&self) -> Box<dyn GpuFuture> {
-		Box::new(vulkano::sync::now(self.device.clone()))
+	#[inline]
+	pub fn get_frame_end(&self) -> impl GpuFuture {
+		vulkano::sync::now(self.device.clone())
 	}
 
+	#[inline]
 	pub fn acquire_next_image(&self) -> Result<(usize, vulkano::swapchain::SwapchainAcquireFuture<Arc<Window>>), vulkano::swapchain::AcquireError> {
 		vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None)
 	}
 
 	// TODO: cleanup this
+	#[inline]
 	pub fn build_draw_command_buffer<PC>(
 		&self,
 		pass: &Pass,
@@ -105,6 +108,7 @@ impl Device {
 		Ok((command_buffer, acquire_future, image_num))
 	}
 
+	#[inline]
 	pub fn execute_after<F, C>(&self, future: F, commands: C)
 	-> Result<CommandBufferExecFuture<F, C>, CommandBufferExecError>
 	where
@@ -114,12 +118,14 @@ impl Device {
 		future.then_execute(self.graphics_queue.clone(), commands)
 	}
 
+	#[inline]
 	pub fn present_after<F>(&self, future: F, image_index: usize) -> PresentFuture<F, Arc<Window>>
 	where F: GpuFuture
 	{
 		future.then_swapchain_present(self.graphics_queue.clone(), self.swapchain.clone(), image_index)
 	}
 
+	#[inline]
 	pub fn flush_after<F>(&self, future: F) -> Result<FenceSignalFuture<F>, FlushError>
 	where F: GpuFuture
 	{

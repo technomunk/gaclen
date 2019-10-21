@@ -11,7 +11,7 @@ pub struct Vertex2D {
 
 vulkano::impl_vertex!(Vertex2D, position);
 
-pub fn triangle(device: &Device) -> Arc<dyn BufferAccess + Send + Sync> {
+pub fn triangle(device: &Device) -> Arc<impl BufferAccess + Send + Sync> {
 	CpuAccessibleBuffer::from_iter(device.device.clone(), vulkano::buffer::BufferUsage::all(), [
 		Vertex2D { position: [-0.5, 0.5] },
 		Vertex2D { position: [0.0, -0.5] },

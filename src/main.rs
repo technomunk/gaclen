@@ -32,9 +32,9 @@ fn main() {
 	let mut pass = graphics::pipeline::Pass::new(&device, &window).unwrap();
 	let mut recreate_swapchain = false;
 
-	let triangle_buffer = graphics::buffer::triangle(&device);
+	let triangle_buffer = graphics::buffer::triangle(&device) as std::sync::Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>;
 
-	let mut previous_frame_end = Some(device.get_frame_end());
+	let mut previous_frame_end = Some(Box::new(device.get_frame_end()) as Box<dyn vulkano::sync::GpuFuture>);
 
 	let mut running = true;
 	while running {
@@ -61,11 +61,11 @@ fn main() {
 			Ok(future) => previous_frame_end = Some(Box::new(future)),
 			Err(vulkano::sync::FlushError::OutOfDate) => {
 				recreate_swapchain = true;
-				previous_frame_end = Some(device.get_frame_end());
+				previous_frame_end = Some(Box::new(device.get_frame_end()));
 			},
 			Err(err) => {
 				println!("Error presenting: {:?}", err);
-				previous_frame_end = Some(device.get_frame_end());
+				previous_frame_end = Some(Box::new(device.get_frame_end()));
 			}
 		}
 

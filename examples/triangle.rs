@@ -1,8 +1,7 @@
-// This file is NOT exported by the crate
-// It is used to manually test the functionality of the engine
+extern crate gaclen;
 
-mod graphics;
-mod window;
+use gaclen::graphics;
+use gaclen::window;
 
 use vulkano::sync::GpuFuture;
 
@@ -33,7 +32,7 @@ fn main() {
 	let mut recreate_swapchain = false;
 
 	let triangle_buffer = graphics::buffer::triangle(&device) as std::sync::Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>;
-
+	
 	let mut previous_frame_end = Some(Box::new(device.get_frame_end()) as Box<dyn vulkano::sync::GpuFuture>);
 
 	let mut running = true;

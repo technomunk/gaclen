@@ -95,14 +95,14 @@ impl Device {
 	pub fn build_draw_command_buffer<PC>(
 		&self,
 		pass: &Pass,
-		vertex_buffer: &Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
+		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
 		clear_color: [f32; 4],
 		push_constants: PC
 	) -> Result<(vulkano::command_buffer::AutoCommandBuffer, vulkano::swapchain::SwapchainAcquireFuture<Arc<Window>>, usize), ()> {
 		let (image_num, acquire_future) = self.acquire_next_image().unwrap();
 		let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap()
 			.begin_render_pass(pass.framebuffers[image_num].clone(), false, vec!(clear_color.into())).unwrap()
-			.draw(pass.graphics_pipeline.clone(), &pass.dynamic_state, vertex_buffer.clone(), (), push_constants).unwrap()
+			.draw(pass.graphics_pipeline.clone(), &pass.dynamic_state, vertex_buffer, (), push_constants).unwrap()
 			.end_render_pass().unwrap()
 			.build().unwrap();
 		Ok((command_buffer, acquire_future, image_num))

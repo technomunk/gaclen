@@ -1,7 +1,6 @@
 extern crate gaclen;
 
 use gaclen::graphics;
-use gaclen::window;
 
 use vulkano::sync::GpuFuture;
 
@@ -45,9 +44,9 @@ fn main() {
 			recreate_swapchain = false;
 		}
 
-		let buffers = vec!(triangle_buffer.clone());
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
-		let (commands, acquire_future, image_num) = device.build_draw_command_buffer(&pass, &buffers, clear_color, push_constants_from_time(start_time.elapsed().as_secs_f64())).unwrap();
+		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f64());
+		let (commands, acquire_future, image_num) = device.build_draw_command_buffer(&pass, vec![triangle_buffer.clone()], clear_color, push_constants).unwrap();
 
 		let prev = previous_frame_end.take();
 		let after_commands_built = prev.unwrap().join(acquire_future);

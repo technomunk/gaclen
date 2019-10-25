@@ -4,7 +4,11 @@ pub mod buffer;
 pub mod pipeline;
 pub mod shader;
 
-const REQUIRED_VULKAN_VERSION: vulkano::instance::Version = vulkano::instance::Version { major: 1, minor: 0, patch: 0 };
+pub use vulkano::instance::Version;
+
+const REQUIRED_VULKAN_VERSION: Version = Version { major: 1, minor: 0, patch: 0 };
+const ENGINE_NAME: &str = "gaclen";
+const ENGINE_VERSION: Version = Version { major: 0, minor: 0, patch: 0 };
 
 #[derive(Debug)]
 pub enum ResizeError {

@@ -2,26 +2,45 @@ use crate::window::Window;
 use super::device::Device;
 use super::ResizeError;
 
+use vulkano::command_buffer::DynamicState;
 use vulkano::framebuffer::{FramebufferAbstract, RenderPassAbstract, RenderPassCreationError, Subpass};
 use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineAbstract, GraphicsPipelineCreationError};
-use vulkano::command_buffer::DynamicState;
+use vulkano::pipeline::shader::{GraphicsEntryPointAbstract};
 
 use std::sync::Arc;
 
+// A GraphicalPass produces visible images as its result.
+pub trait GraphicalPass {
+	type Pipeline: ?Sized + GraphicsPipelineAbstract + Send + Sync + 'static;
+	type Framebuffer: ?Sized + FramebufferAbstract + Send + Sync + 'static;
 
-// Pass is a stage in the rendering pipeline that takes some inputs, does some processing with provided shaders and provides some output
-pub struct Pass {
-	pub(super) render_pass: Arc<dyn RenderPassAbstract + Send + Sync>,
-	pub(super) graphics_pipeline: Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
-	pub(super) framebuffers: Vec<Arc<dyn FramebufferAbstract + Send + Sync>>,
-
-	// TODO: not all passes required dynamics state, only dynamic ones
-	pub(super) dynamic_state: DynamicState,
+	// Get dynamic state of the GraphicalPass
+	fn dynamic_state(&self) -> &DynamicState;
+	// Get the underlying pipeline of the GraphicalPass
+	fn pipeline(&self) -> Arc<Self::Pipeline>;
+	// TODO: consider switching to a slice instead
+	// Get the resulting framebuffers of the GraphicalPass
+	fn framebuffers(&self) -> Vec<Arc<Self::Framebuffer>>;
 }
 
-// Pipeline is a collection of Passes and their dependencies that allows execution of commands in a defined ordering on GPU
-pub struct Pipeline {
-	// TODO: populate
+pub struct AlbedoPass {
+	render_pass: Arc<dyn RenderPassAbstract + Send + Sync>,
+	graphics_pipeline: Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
+	framebuffers: Vec<Arc<dyn FramebufferAbstract + Send + Sync>>,
+
+	dynamic_state: DynamicState,
+}
+
+impl GraphicalPass for AlbedoPass {
+	type Pipeline = dyn GraphicsPipelineAbstract + Send + Sync + 'static;
+	type Framebuffer = dyn FramebufferAbstract + Send + Sync + 'static;
+
+	#[inline(always)]
+	fn dynamic_state(&self) -> &DynamicState { &self.dynamic_state }
+	#[inline(always)]
+	fn pipeline(&self) -> Arc<Self::Pipeline> { self.graphics_pipeline.clone() }
+	#[inline(always)]
+	fn framebuffers(&self) -> Vec<Arc<Self::Framebuffer>> { self.framebuffers.clone() }
 }
 
 #[derive(Debug)]
@@ -31,13 +50,23 @@ pub enum PassCreationError {
 	DynamicState(ResizeError), // Error during initial resizing
 }
 
-
-impl Pass {
-	// Create a new Pass that uses provided shaders
-	pub fn new(
+impl AlbedoPass {
+	pub fn new<VS, FS, T>(
 		device: &Device,
-		window: &Arc<Window>
-	) -> Result<Pass, PassCreationError> {
+		window: &Arc<Window>,
+		vertex_shader: VS,
+		vssc: VS::SpecializationConstants,
+		fragment_shader: FS,
+		fssc: FS::SpecializationConstants
+	) -> Result<AlbedoPass, PassCreationError>
+	where
+		VS : GraphicsEntryPointAbstract,
+		FS : GraphicsEntryPointAbstract,
+		VS::PipelineLayout : Send + Sync + Clone + 'static,
+		FS::PipelineLayout : Send + Sync + Clone + 'static,
+		T : Send + Sync + 'static,
+		vulkano::pipeline::vertex::SingleBufferDefinition<T> : vulkano::pipeline::vertex::VertexDefinition<VS::InputDefinition>
+	{
 		let render_pass = Arc::new(vulkano::single_pass_renderpass!(
 			device.device.clone(),
 			attachments: {
@@ -51,24 +80,20 @@ impl Pass {
 			pass: {
 				color: [color],
 				depth_stencil: {}
-			}
-		)?);
-
-		let vs = super::shader::vertex::Shader::load(device.device.clone()).unwrap();
-		let fs = super::shader::fragment::Shader::load(device.device.clone()).unwrap();
+			})?);
 
 		let graphics_pipeline = Arc::new(GraphicsPipeline::start()
-			.vertex_input_single_buffer::<super::buffer::Vertex2D>()
-			.vertex_shader(vs.main_entry_point(), ())
+			.vertex_input_single_buffer::<T>()
+			.vertex_shader(vertex_shader, vssc)
 			.triangle_list()
-			.viewports_dynamic_scissors_irrelevant(1)
-			.fragment_shader(fs.main_entry_point(), ())
+			.viewports_dynamic_scissors_irrelevant(0)
+			.fragment_shader(fragment_shader, fssc)
 			.render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
 			.build(device.device.clone())?);
 		
-		let mut pass = Pass {
-			render_pass,
+		let mut pass = AlbedoPass {
 			graphics_pipeline,
+			render_pass,
 			framebuffers: Vec::new(),
 			dynamic_state: DynamicState::default(),
 		};
@@ -100,7 +125,6 @@ impl Pass {
 		Ok(())
 	}
 }
-
 
 impl From<RenderPassCreationError> for PassCreationError {
 	fn from(err: RenderPassCreationError) -> PassCreationError { PassCreationError::RenderPass(err) }

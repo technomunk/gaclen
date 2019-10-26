@@ -1,8 +1,6 @@
 pub mod context;
 pub mod device;
-pub mod buffer;
-pub mod pipeline;
-pub mod shader;
+pub mod pass;
 
 pub use vulkano::instance::Version;
 

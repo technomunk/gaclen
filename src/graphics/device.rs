@@ -1,17 +1,17 @@
 use crate::window::Window;
 use super::context::Context;
 use super::ResizeError;
-use super::pipeline::Pass;
+use super::pass::GraphicalPass;
 
 use std::sync::Arc;
 
-use vulkano::instance::PhysicalDevice;
+use vulkano::buffer::{CpuAccessibleBuffer};
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBuffer, CommandBufferExecError, CommandBufferExecFuture};
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
-use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError, PresentFuture};
 use vulkano::image::SwapchainImage;
+use vulkano::instance::PhysicalDevice;
+use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError, PresentFuture};
 use vulkano::sync::{GpuFuture, FenceSignalFuture, FlushError};
-use vulkano::command_buffer::{CommandBuffer, CommandBufferExecError, CommandBufferExecFuture};
-
 
 type ImageFormat = (vulkano::format::Format, vulkano::swapchain::ColorSpace);
 
@@ -27,6 +27,13 @@ pub struct Device {
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
 }
 
+// A device that is in the middle of drawing a frame
+pub struct DrawingDevice {
+	device: Device,
+	time: Box<dyn GpuFuture>,
+	commands: AutoCommandBufferBuilder,
+	image_index: usize,
+}
 
 #[derive(Debug)]
 pub enum DeviceCreationError {
@@ -38,6 +45,12 @@ pub enum DeviceCreationError {
 	Swapchain(SwapchainCreationError), // Error during the creation of the swapchain
 	NoCompatibleFormatFound, // No compatible format for window draw surface was found
 	UnsizedWindow, // Window has no inner size
+}
+
+#[derive(Debug)]
+pub enum FrameFinishError {
+	Flush(FlushError), // Error during flushing commands to the GPU
+	Commands(CommandBufferExecError), // Error during attempted execution of GPU commands
 }
 
 impl Device {
@@ -68,7 +81,7 @@ impl Device {
 		Ok(device)
 	}
 
-	pub fn window_resized(&mut self, window: &Window) -> Result<(), ResizeError> {
+	pub fn resize_for_window(&mut self, window: &Window) -> Result<(), ResizeError> {
 		let dimensions: (u32, u32) = match window.get_inner_size() {
 			Some(size) => size.into(),
 			None => return Err(ResizeError::UnsizedWindow),
@@ -81,55 +94,65 @@ impl Device {
 	}
 
 	#[inline]
-	pub fn get_frame_end(&self) -> impl GpuFuture {
-		vulkano::sync::now(self.device.clone())
+	pub fn start_frame(
+		self,
+		when: Option<Box<dyn GpuFuture>>,
+		final_pass: &impl GraphicalPass,
+		clear_value: Vec<vulkano::format::ClearValue>
+	) -> Result<DrawingDevice, vulkano::swapchain::AcquireError> {
+		let (image_index, image_acquire_time) = vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None)?;
+
+		let time: Box<dyn GpuFuture> = match when {
+			Some(time) => Box::new(time.join(image_acquire_time)),
+			None => Box::new(vulkano::sync::now(self.device.clone()).join(image_acquire_time)),
+		};
+
+		let commands = {
+			AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap()
+				.begin_render_pass(final_pass.framebuffers()[image_index].clone(), false, clear_value).unwrap()
+		};
+
+		let draw_device = DrawingDevice {
+			device: self,
+			time,
+			commands,
+			image_index
+		};
+		Ok(draw_device)
 	}
 
-	#[inline]
-	pub fn acquire_next_image(&self) -> Result<(usize, vulkano::swapchain::SwapchainAcquireFuture<Arc<Window>>), vulkano::swapchain::AcquireError> {
-		vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None)
+	pub fn create_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, vulkano::memory::DeviceMemoryAllocError> {
+		CpuAccessibleBuffer::from_iter(self.device.clone(), vulkano::buffer::BufferUsage::all(), data_iterator)
 	}
+}
 
-	// TODO: cleanup this
+impl DrawingDevice {
 	#[inline]
-	pub fn build_draw_command_buffer<PC>(
-		&self,
-		pass: &Pass,
+	pub fn draw<PC>(
+		self,
+		pass: &impl GraphicalPass,
 		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
-		clear_color: [f32; 4],
 		push_constants: PC
-	) -> Result<(vulkano::command_buffer::AutoCommandBuffer, vulkano::swapchain::SwapchainAcquireFuture<Arc<Window>>, usize), ()> {
-		let (image_num, acquire_future) = self.acquire_next_image().unwrap();
-		let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap()
-			.begin_render_pass(pass.framebuffers[image_num].clone(), false, vec!(clear_color.into())).unwrap()
-			.draw(pass.graphics_pipeline.clone(), &pass.dynamic_state, vertex_buffer, (), push_constants).unwrap()
-			.end_render_pass().unwrap()
-			.build().unwrap();
-		Ok((command_buffer, acquire_future, image_num))
+	) -> Self {
+		let commands = self.commands.draw(pass.pipeline(), pass.dynamic_state(), vertex_buffer, (), push_constants).unwrap();
+		DrawingDevice { commands, .. self }
 	}
 
 	#[inline]
-	pub fn execute_after<F, C>(&self, future: F, commands: C)
-	-> Result<CommandBufferExecFuture<F, C>, CommandBufferExecError>
-	where
-		F: GpuFuture,
-		C: CommandBuffer + 'static
-	{
-		future.then_execute(self.graphics_queue.clone(), commands)
-	}
+	pub fn finish_frame(self) -> (Device, Result<Box<dyn GpuFuture>, FrameFinishError>) {
+		let commands = self.commands.end_render_pass().unwrap().build().unwrap();
+		let after_execute = match self.time.then_execute(self.device.graphics_queue.clone(), commands) {
+			Ok(future) => future,
+			Err(err) => return (self.device, Err(FrameFinishError::Commands(err))),
+		};
 
-	#[inline]
-	pub fn present_after<F>(&self, future: F, image_index: usize) -> PresentFuture<F, Arc<Window>>
-	where F: GpuFuture
-	{
-		future.then_swapchain_present(self.graphics_queue.clone(), self.swapchain.clone(), image_index)
-	}
-
-	#[inline]
-	pub fn flush_after<F>(&self, future: F) -> Result<FenceSignalFuture<F>, FlushError>
-	where F: GpuFuture
-	{
-		future.then_signal_fence_and_flush()
+		let after_flush = after_execute.then_swapchain_present(self.device.graphics_queue.clone(), self.device.swapchain.clone(), self.image_index)
+			.then_signal_fence_and_flush();
+		
+		match after_flush {
+			Ok(future) => (self.device, Ok(Box::new(future))),
+			Err(err) => (self.device, Err(FrameFinishError::Flush(err))),
+		}
 	}
 }
 

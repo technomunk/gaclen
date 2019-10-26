@@ -27,45 +27,45 @@ fn main() {
 	let mut device = graphics::device::Device::new(&context, window.clone()).unwrap();
 	println!("Initialized device: {:?}", device);
 
-	let mut pass = graphics::pipeline::Pass::new(&device, &window).unwrap();
+	let mut pass = graphics::pass::AlbedoPass::new(&device, &window).unwrap();
 	let mut recreate_swapchain = false;
 
 	let triangle_buffer = graphics::buffer::triangle(&device) as std::sync::Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>;
 	
-	let mut previous_frame_end = Some(Box::new(device.get_frame_end()) as Box<dyn vulkano::sync::GpuFuture>);
+	let mut previous_frame_end: Option<Box<dyn vulkano::sync::GpuFuture>> = None;
 
 	let mut running = true;
 	while running {
-		previous_frame_end.as_mut().unwrap().cleanup_finished();
+		if let Some(time) = &mut previous_frame_end {
+			time.cleanup_finished();
+		}
 
 		if recreate_swapchain {
-			device.window_resized(&window).unwrap();
+			device.resize_for_window(&window).unwrap();
 			pass.resize_for_window(&device, &window).unwrap();
 			recreate_swapchain = false;
 		}
 
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f64());
-		let (commands, acquire_future, image_num) = device.build_draw_command_buffer(&pass, vec![triangle_buffer.clone()], clear_color, push_constants).unwrap();
+		
+		let (updated_device, after_frame) = device.start_frame(previous_frame_end, &pass, vec![clear_color.into()]).unwrap()
+			.draw(&pass, vec![triangle_buffer.clone()], push_constants)
+			.finish_frame();
+		
+		device = updated_device;
 
-		let prev = previous_frame_end.take();
-		let after_commands_built = prev.unwrap().join(acquire_future);
-
-		let after_draw = device.execute_after(after_commands_built, commands).unwrap();
-		let after_present = device.present_after(after_draw, image_num);
-		let after_flush = device.flush_after(after_present);
-
-		match after_flush {
-			Ok(future) => previous_frame_end = Some(Box::new(future)),
-			Err(vulkano::sync::FlushError::OutOfDate) => {
+		match after_frame {
+			Ok(future) => previous_frame_end = Some(future),
+			Err(graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate)) => {
 				recreate_swapchain = true;
-				previous_frame_end = Some(Box::new(device.get_frame_end()));
+				previous_frame_end = None;
 			},
 			Err(err) => {
-				println!("Error presenting: {:?}", err);
-				previous_frame_end = Some(Box::new(device.get_frame_end()));
+				println!("Error drawing: {:?}", err);
+				previous_frame_end = None;
 			}
-		}
+		};
 
 		frame_count = frame_count + 1;
 

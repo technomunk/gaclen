@@ -24,7 +24,7 @@ fn main() {
 	let mut events_loop = EventsLoop::new();
 	let window = std::sync::Arc::new(
 		WindowBuilder::new()
-			.with_title("Triangle example")
+			.with_title("Quad example")
 			.with_dimensions((1280, 720).into())
 			.with_min_dimensions((1280, 720).into())
 			.build(&events_loop).unwrap()

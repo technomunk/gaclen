@@ -104,8 +104,8 @@ fn main() {
 fn push_constants_from_time(time: f32, window_resolution: (u32, u32)) -> shaders::vertex::ty::PushConstantData {
 	let time = time / 5.0;
 
-	let x = time.cos() * 0.0;
-	let y = time.sin() * 0.0 - 1.0;
+	let x = time.cos();
+	let y = time.sin();
 
 	let view = cgmath::Matrix4::look_at(
 		cgmath::Point3 { x, y, z: 1.0 },

@@ -6,12 +6,12 @@ use super::pass::GraphicalPass;
 use std::sync::Arc;
 
 use vulkano::buffer::{CpuAccessibleBuffer};
-use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBuffer, CommandBufferExecError, CommandBufferExecFuture};
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError};
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
 use vulkano::image::SwapchainImage;
 use vulkano::instance::PhysicalDevice;
-use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError, PresentFuture};
-use vulkano::sync::{GpuFuture, FenceSignalFuture, FlushError};
+use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError};
+use vulkano::sync::{GpuFuture, FlushError};
 
 type ImageFormat = (vulkano::format::Format, vulkano::swapchain::ColorSpace);
 
@@ -99,11 +99,17 @@ impl Device {
 		when: Option<Box<dyn GpuFuture>>,
 		final_pass: &impl GraphicalPass,
 		clear_value: Vec<vulkano::format::ClearValue>
-	) -> Result<DrawingDevice, vulkano::swapchain::AcquireError> {
-		let (image_index, image_acquire_time) = vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None)?;
+	) -> Result<DrawingDevice, (Self, vulkano::swapchain::AcquireError)> {
+		let (image_index, image_acquire_time) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
+			Ok(result) => result,
+			Err(err) => return Err((self, err)),
+		};
 
 		let time: Box<dyn GpuFuture> = match when {
-			Some(time) => Box::new(time.join(image_acquire_time)),
+			Some(mut time) => {
+				time.cleanup_finished();
+				Box::new(time.join(image_acquire_time))
+			},
 			None => Box::new(vulkano::sync::now(self.device.clone()).join(image_acquire_time)),
 		};
 
@@ -124,6 +130,8 @@ impl Device {
 	pub fn create_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, vulkano::memory::DeviceMemoryAllocError> {
 		CpuAccessibleBuffer::from_iter(self.device.clone(), vulkano::buffer::BufferUsage::all(), data_iterator)
 	}
+
+	pub fn logical_device(&self) -> Arc<LogicalDevice> { self.device.clone() }
 }
 
 impl DrawingDevice {

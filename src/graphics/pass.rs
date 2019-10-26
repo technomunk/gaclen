@@ -86,7 +86,8 @@ impl AlbedoPass {
 			.vertex_input_single_buffer::<T>()
 			.vertex_shader(vertex_shader, vssc)
 			.triangle_list()
-			.viewports_dynamic_scissors_irrelevant(0)
+			.cull_mode_back()
+			.viewports_dynamic_scissors_irrelevant(1)
 			.fragment_shader(fragment_shader, fssc)
 			.render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
 			.build(device.device.clone())?);
@@ -102,14 +103,17 @@ impl AlbedoPass {
 	}
 
 	pub fn resize_for_window(&mut self, device: &Device, window: &Arc<Window>) -> Result<(), ResizeError> {
-		let dimensions: (u32, u32) = match window.get_inner_size() {
-			Some(size) => size.into(),
+		let dimensions: (f32, f32) = match window.get_inner_size() {
+			Some(size) => {
+				let size: (u32, u32) = size.into();
+				(size.0 as f32, size.1 as f32)
+			},
 			None => return Err(ResizeError::UnsizedWindow)
 		};
 		
 		let viewport = vulkano::pipeline::viewport::Viewport {
-			origin: [0.0, 0.0],
-			dimensions: [dimensions.0 as f32, dimensions.1 as f32],
+			origin: [0.0, dimensions.1],
+			dimensions: [dimensions.0, -dimensions.1],
 			depth_range: 0.0 .. 1.0,
 		};
 

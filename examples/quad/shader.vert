@@ -10,7 +10,7 @@ layout(push_constant) uniform PushConstantData {
 layout(location = 0) out vec4 out_color;
 
 void main() {
-	gl_Position = MVP * vec4(position, 0.0);
+	gl_Position = pc.MVP * vec4(position, 1.0);
 
 	out_color = color;
 }

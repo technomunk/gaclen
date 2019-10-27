@@ -1,8 +1,8 @@
-/// Graphics provide hardware accelerated rendering.
-/// 
-/// This is a major part of [gaclen](index.html), since rendering is exclusive to clients.
-/// 
-/// The graphical workflow is extensive, please refer to [examlpes](https://github.com/Griffone/gaclen/tree/master/examples) for help.
+//! Graphics provide hardware accelerated rendering.
+//! 
+//! This is a major part of [gaclen](index.html), since rendering is exclusive to clients.
+//! 
+//! The graphical workflow is extensive, please refer to [examlpes](https://github.com/Griffone/gaclen/tree/master/examples) for help.
 
 pub mod context;
 pub mod device;

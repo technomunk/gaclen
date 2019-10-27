@@ -1,6 +1,6 @@
 [package]
 name = "gaclen"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
 edition = "2018"
 

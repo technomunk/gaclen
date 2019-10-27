@@ -1,6 +1,6 @@
 [package]
 name = "gaclen"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
 edition = "2018"
 
@@ -11,9 +11,7 @@ categories = ["rendering::engine", "game-engines", "graphics"]
 license = "Apache-2.0 OR MIT"
 
 repository = "https://github.com/Griffone/gaclen"
-
-[badges]
-appveyor = { repository = "https://github.com/Griffone/gaclen", branch = "master", service = "github" }
+documentation = "https://docs.rs/gaclen"
 
 [dependencies]
 winit = "0.19.*" # window handling

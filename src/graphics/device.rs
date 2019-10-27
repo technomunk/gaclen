@@ -15,7 +15,9 @@ use vulkano::sync::{GpuFuture, FlushError};
 
 type ImageFormat = (vulkano::format::Format, vulkano::swapchain::ColorSpace);
 
-// A graphical device responsible for using hardware acceleration.
+/// A device responsible for hardware-accelerated computations.
+/// 
+/// It is responsible for recording, submitting and synchronizing commands and data to the GPU.
 pub struct Device {
 	pub(super) device: Arc<LogicalDevice>,
 
@@ -27,7 +29,7 @@ pub struct Device {
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
 }
 
-// A device that is in the middle of drawing a frame
+/// A device that is in the middle of drawing a frame.
 pub struct DrawingDevice {
 	device: Device,
 	time: Box<dyn GpuFuture>,
@@ -35,25 +37,38 @@ pub struct DrawingDevice {
 	image_index: usize,
 }
 
+/// Error during device creation.
 #[derive(Debug)]
 pub enum DeviceCreationError {
-	NoPhysicalDevicesFound, // There were no physical devices to chose from
-	NoCompatiblePhysicalDeviceFound, // Some physical devices were found but were not applicable for gaclen
-	Logical(vulkano::device::DeviceCreationError), // Error during the creation of logical device
-	Surface(vulkano::swapchain::SurfaceCreationError), // Error during the creation of the draw surface
-	SurfaceCapabilities(vulkano::swapchain::CapabilitiesError), // Error querying draw surface capabilities
-	Swapchain(SwapchainCreationError), // Error during the creation of the swapchain
-	NoCompatibleFormatFound, // No compatible format for window draw surface was found
-	UnsizedWindow, // Window has no inner size
+	/// No hardware devices were found.
+	NoPhysicalDevicesFound,
+	/// Some hardware devices was found, but none of it was applicable for gaclen.
+	NoCompatiblePhysicalDeviceFound,
+	/// Error during the creation of logical device.
+	Logical(vulkano::device::DeviceCreationError),
+	/// Error during the creation of draw-surface.
+	Surface(vulkano::swapchain::SurfaceCreationError),
+	/// Error during querying draw-surface capabilities.
+	SurfaceCapabilities(vulkano::swapchain::CapabilitiesError),
+	/// Error during the creation of the swapchain.
+	Swapchain(SwapchainCreationError),
+	/// No applicable format for draw-surface was found.
+	NoCompatibleFormatFound,
+	/// Window passed for the creation of the device has no apparent size..
+	UnsizedWindow,
 }
 
+/// Error finishing the frame.
 #[derive(Debug)]
 pub enum FrameFinishError {
-	Flush(FlushError), // Error during flushing commands to the GPU
-	Commands(CommandBufferExecError), // Error during attempted execution of GPU commands
+	/// Error during flushing commands to the GPU.
+	Flush(FlushError),
+	/// Error during attempted execution of GPU commands.
+	Commands(CommandBufferExecError),
 }
 
 impl Device {
+	/// Create a new device that targets a specific window.
 	pub fn new(context: &Context, window: Arc<Window>) -> Result<Device, DeviceCreationError> {
 		let physical = select_physical_device(context)?;
 
@@ -81,6 +96,7 @@ impl Device {
 		Ok(device)
 	}
 
+	/// Update the device for the resized window.
 	pub fn resize_for_window(&mut self, window: &Window) -> Result<(), ResizeError> {
 		let dimensions: (u32, u32) = match window.get_inner_size() {
 			Some(size) => size.into(),
@@ -93,6 +109,11 @@ impl Device {
 		Ok(())
 	}
 
+	/// Start drawing the frame.
+	/// 
+	/// Takes ownership of the [Device](struct.Device.html) and converts it to a [DrawingDevice](struct.DrawingDevice.html).
+	/// This corresponds to switching to the special 'middle of frame' state, that caches intermediate commands before submitting them to the GPU.
+	/// To exit the state and get back the ownership of the [Device](struct.Device.html) call .finish_frame() method.
 	#[inline]
 	pub fn start_frame(
 		self,
@@ -127,14 +148,20 @@ impl Device {
 		Ok(draw_device)
 	}
 
+	/// Create a basic buffer for data for processing on the GPU.
 	pub fn create_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, vulkano::memory::DeviceMemoryAllocError> {
 		CpuAccessibleBuffer::from_iter(self.device.clone(), vulkano::buffer::BufferUsage::all(), data_iterator)
 	}
 
+	/// Get the underlying logical device (useful for supplying to own shaders).
 	pub fn logical_device(&self) -> Arc<LogicalDevice> { self.device.clone() }
 }
 
 impl DrawingDevice {
+	/// Draw some data.
+	/// 
+	/// The exact result depends highly on the [GraphicalPass](traits.GraphicalPass.html) in question.
+	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
 	#[inline]
 	pub fn draw<PC>(
 		self,
@@ -146,6 +173,8 @@ impl DrawingDevice {
 		DrawingDevice { commands, .. self }
 	}
 
+	/// Finish drawing the frame and flush the commands to the GPU.
+	/// Note that it does not block execution until the frame is done, rather providing a GpuFuture for when the frame will have been drawn.
 	#[inline]
 	pub fn finish_frame(self) -> (Device, Result<Box<dyn GpuFuture>, FrameFinishError>) {
 		let commands = self.commands.end_render_pass().unwrap().build().unwrap();

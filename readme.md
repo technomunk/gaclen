@@ -4,8 +4,7 @@ A full-stack 3D game client engine in [Rust](https://www.rust-lang.org).
 
 ## Setup
 
-1. Add "gaclen" of appropriate version to dependencies of your project (in Cargo.toml file).
-2. Additionally follow [vulkano-shaders](https://github.com/vulkano-rs/vulkano#setup) setup steps, as the project depends on that package.
+The project relies on [vulkano-shaders](https://crates.io/crates/vulkano-shaders), which requires [additional setups steps](https://github.com/vulkano-rs/vulkano#setup). Please follow them.
 
 ## Supported features
 

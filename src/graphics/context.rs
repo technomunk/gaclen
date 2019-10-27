@@ -6,19 +6,23 @@ use vulkano::instance::InstanceExtensions;
 
 use super::{ENGINE_NAME, ENGINE_VERSION};
 
-// A Vulkan driver-talking context instance.
+/// An instance of graphical context.
+/// 
+/// It holds global graphics-api state information.
 pub struct Context {
 	pub(super) instance: Arc<Instance>
 }
 
 impl Context {
 
-	// Create a new instance of Context with all extensions required by gaclen.
-	// Will propogate underlying vulkano::instance::InstanceCreationError.
+	/// Create a new instance of Context.
+	/// 
+	/// Will use blank application name and version.
 	pub fn new() -> Result<Context, InstanceCreationError> { Context::create(None, None, vulkano_win::required_extensions()) }
 
-	// Provide a custom application name and a version to the Instance.
-	// This will allow for driver-side optimizations specific to your application.
+	/// Create a new instance of Context with an application name and version.
+	/// 
+	/// This will allow for potential driver-side optimizations specific to your application.
 	pub fn with_app_info(name: &str, version: Version) -> Result<Context, InstanceCreationError> { Context::create(Some(name), Some(version), vulkano_win::required_extensions()) }
 
 	// TODO: add a version with custom extensions

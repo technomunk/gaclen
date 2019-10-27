@@ -11,6 +11,7 @@ categories = ["rendering::engine", "game-engines", "graphics"]
 license = "Apache-2.0 OR MIT"
 
 repository = "https://github.com/Griffone/gaclen"
+documentation = "https://docs.rs/gaclen"
 
 [dependencies]
 winit = "0.19.*" # window handling

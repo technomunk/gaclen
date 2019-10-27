@@ -9,18 +9,29 @@ use vulkano::pipeline::shader::{GraphicsEntryPointAbstract};
 
 use std::sync::Arc;
 
-// A GraphicalPass produces visible images as its result.
+/// A GraphicalPass produces visible images as its result.
 pub trait GraphicalPass {
 	type Pipeline: ?Sized + GraphicsPipelineAbstract + Send + Sync + 'static;
 	type Framebuffer: ?Sized + FramebufferAbstract + Send + Sync + 'static;
 
-	// Get dynamic state of the GraphicalPass
+	/// Get dynamic state of the GraphicalPass
 	fn dynamic_state(&self) -> &DynamicState;
-	// Get the underlying pipeline of the GraphicalPass
+	/// Get the underlying pipeline of the GraphicalPass
 	fn pipeline(&self) -> Arc<Self::Pipeline>;
 	// TODO: consider switching to a slice instead
-	// Get the resulting framebuffers of the GraphicalPass
+	/// Get the resulting framebuffers of the GraphicalPass
 	fn framebuffers(&self) -> Vec<Arc<Self::Framebuffer>>;
+}
+
+/// Error during creation of the AlbedoPass
+#[derive(Debug)]
+pub enum PassCreationError {
+	/// Error during creation of the underlying vulkan render-pass
+	RenderPass(RenderPassCreationError),
+	/// Error during creation of the underlying vulkan graphics-pipeline
+	GraphicsPipeline(GraphicsPipelineCreationError),
+	/// Error during initial resizing
+	Resize(ResizeError),
 }
 
 pub struct AlbedoPass {
@@ -43,14 +54,8 @@ impl GraphicalPass for AlbedoPass {
 	fn framebuffers(&self) -> Vec<Arc<Self::Framebuffer>> { self.framebuffers.clone() }
 }
 
-#[derive(Debug)]
-pub enum PassCreationError {
-	RenderPass(RenderPassCreationError), // Error during creation of the underlying vulkan render-pass
-	GraphicsPipeline(GraphicsPipelineCreationError), // Error during creation of the underlying vulkan graphics-pipeline
-	DynamicState(ResizeError), // Error during initial resizing
-}
-
 impl AlbedoPass {
+	/// Create a new AlbedoPass.
 	pub fn new<VS, FS, T>(
 		device: &Device,
 		window: &Arc<Window>,
@@ -102,6 +107,7 @@ impl AlbedoPass {
 		Ok(pass)
 	}
 
+	/// Update the AlbedoPass for the new size of the window.
 	pub fn resize_for_window(&mut self, device: &Device, window: &Arc<Window>) -> Result<(), ResizeError> {
 		let dimensions: (f32, f32) = match window.get_inner_size() {
 			Some(size) => {
@@ -137,5 +143,5 @@ impl From<GraphicsPipelineCreationError> for PassCreationError {
 	fn from(err: GraphicsPipelineCreationError) -> PassCreationError { PassCreationError::GraphicsPipeline(err) }
 }
 impl From<ResizeError> for PassCreationError {
-	fn from(err: ResizeError) -> PassCreationError { PassCreationError::DynamicState(err) }
+	fn from(err: ResizeError) -> PassCreationError { PassCreationError::Resize(err) }
 }

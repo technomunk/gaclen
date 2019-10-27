@@ -1,3 +1,15 @@
+//! The device uses GPU to execute rendering and computing commands.
+//! 
+//! In order to get an image using a [Device](struct.Device.html) one needs to:
+//! 1. [Create it](struct.Device.html#method.new).
+//! 2. [Create a render-pass](trait.Pass.html).
+//! 3. [Create a data-buffer](struct.Device.html#method.create_buffer).
+//! 4. [Start a frame](struct.Device.html#method.start_frame).
+//! 5. [Draw using a pass](struct.DrawingDevice.html#method.draw).
+//! 6. [Finish the frame](struct.DrawingDevice.html#method.finish_frame).
+//! 
+//! Note that during the middle of the frame the device switches to [DrawingDevice](struct.DrawingDevice.html) struct, which represents 'middle of frame' state.
+
 use crate::window::Window;
 use super::context::Context;
 use super::ResizeError;
@@ -113,7 +125,7 @@ impl Device {
 	/// 
 	/// Takes ownership of the [Device](struct.Device.html) and converts it to a [DrawingDevice](struct.DrawingDevice.html).
 	/// This corresponds to switching to the special 'middle of frame' state, that caches intermediate commands before submitting them to the GPU.
-	/// To exit the state and get back the ownership of the [Device](struct.Device.html) call .finish_frame() method.
+	/// To exit the state and get back the ownership of the [Device](struct.Device.html) call [finish_frame method](struct.DrawingDevice.html#method.finish_frame.html).
 	#[inline]
 	pub fn start_frame(
 		self,

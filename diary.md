@@ -21,3 +21,19 @@ Greg made rendered triangle.
 - Created graphics::pipeline::Pass struct.
 - Created the functionality to record command buffers.
 - Created the functionality to submit command buffers and present.
+
+## 28-10-2019
+
+Greg published [gaclen](https://crates.io/crates/gaclen).
+
+- Reworked rendering loop to feel nicer.
+- Learned how to publish a crate.
+- Learned about rustdoc.
+- Documented a bunch of code.
+
+## 29-10-2019
+
+Greg imroved documentation, learning a bunch of lessons.
+
+- Improved documentation.
+- Created a [lessons](lessons.md) file that lists learned lessons and ideas from this project.

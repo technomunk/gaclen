@@ -1,3 +1,5 @@
+//! Context holds global Vulkan API state information.
+
 use std::sync::Arc;
 use std::borrow::Cow;
 
@@ -8,7 +10,7 @@ use super::{ENGINE_NAME, ENGINE_VERSION};
 
 /// An instance of graphical context.
 /// 
-/// It holds global graphics-api state information.
+/// It holds global Vulkan API state information.
 pub struct Context {
 	pub(super) instance: Arc<Instance>
 }

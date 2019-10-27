@@ -4,13 +4,12 @@ A full-stack 3D game client engine in [Rust](https://www.rust-lang.org).
 
 ## Setup
 
-1. Clone this repo.
-2. Use cargo to manage the project.
-3. [vulkano-shaders](https://github.com/vulkano-rs/vulkano#setup) requires additional steps, please follow them.
+1. Add "gaclen" of appropriate version to dependencies of your project (in Cargo.toml file).
+2. Additionally follow [vulkano-shaders](https://github.com/vulkano-rs/vulkano#setup) setup steps, as the project depends on that package.
 
 ## Supported features
 
-- [ ] Unlit 3D object rendering
+- [x] Unlit 3D object rendering
 - [ ] Lit 3D object rendering
 - [ ] Semi-transparent object rendering
 - [ ] Text rendering
@@ -35,5 +34,3 @@ These features will not be supported, since they make up a game, or should be co
 - [ ] Limited physics simulation
 - [ ] Inverse kinematics
 - [ ] Forward rendering
-
-## Dependencies

@@ -10,6 +10,8 @@ keywords = ["gamedev", "graphics", "rendering", "vulkan", "gpu"]
 categories = ["rendering::engine", "game-engines", "graphics"]
 license = "Apache-2.0 OR MIT"
 
+repository = "https://github.com/Griffone/gaclen"
+
 [badges]
 appveyor = { repository = "https://github.com/Griffone/gaclen", branch = "master", service = "github" }
 

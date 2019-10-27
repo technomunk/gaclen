@@ -12,9 +12,6 @@ license = "Apache-2.0 OR MIT"
 
 repository = "https://github.com/Griffone/gaclen"
 
-[badges]
-appveyor = { repository = "https://github.com/Griffone/gaclen", branch = "master", service = "github" }
-
 [dependencies]
 winit = "0.19.*" # window handling
 vulkano = "0.14.*" # vulkan library in Rust

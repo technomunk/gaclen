@@ -6,7 +6,6 @@
   - *Frame* - active frame
   - *PassInFrame* - an active graphical pass within a frame
 - changes the example to handle failing resizing device by skipping a frame
-- fixes continuous memory leak in the quad example
 
 ## 0.0.5 PresentMode
 

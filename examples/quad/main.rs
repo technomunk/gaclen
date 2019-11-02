@@ -57,9 +57,13 @@ fn main() {
 	while running {
 		if recreate_swapchain {
 			// Sometimes the swapchain fails to create :(
-			if let Err(graphics::ResizeError::Swapchain(_)) = device.resize_for_window(&window) {
-				println!("Failed to resize window, skipping frame!");
-				continue;
+			match device.resize_for_window(&window) {
+				Ok(()) => (),
+				Err(graphics::ResizeError::Swapchain(_)) => {
+					println!("Failed to resize window, skipping frame!");
+					continue;
+				},
+				Err(err) => panic!(err),
 			};
 			pass.resize_for_window(&device, &window).unwrap();
 			recreate_swapchain = false;
@@ -77,9 +81,7 @@ fn main() {
 		device = match after_frame {
 			Ok(device) => device,
 			Err((device, err)) => {
-				if err == graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) {
-					recreate_swapchain = true;
-				};
+				if err == graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
 				device
 			},
 		};

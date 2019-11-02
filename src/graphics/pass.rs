@@ -1,9 +1,9 @@
 //! Infrastructure for interpreting and computing data.
 //! 
 //! Example passes are:
-//! - *Shadow* - drawing a scene from the point of view of a light source in order to save depth information.
-//! - *Albedo* - drawing typically-represented geometry with lighting and optional shading.
-//! - *Post-process* - screen-space based techniques for processing image before presenting it on the screen.
+//! - **Shadow** - drawing a scene from the point of view of a light source in order to save depth information.
+//! - **Albedo** - drawing typically-represented geometry with lighting and optional shading.
+//! - **Post-process** - screen-space based techniques for processing image before presenting it on the screen.
 
 use crate::window::Window;
 use super::device::Device;
@@ -21,23 +21,23 @@ pub trait GraphicalPass {
 	type Pipeline: ?Sized + GraphicsPipelineAbstract + Send + Sync + 'static;
 	type Framebuffer: ?Sized + FramebufferAbstract + Send + Sync + 'static;
 
-	/// Get dynamic state of the GraphicalPass
+	/// Get dynamic state of the GraphicalPass.
 	fn dynamic_state(&self) -> &DynamicState;
-	/// Get the underlying pipeline of the GraphicalPass
+	/// Get the underlying pipeline of the GraphicalPass.
 	fn pipeline(&self) -> Arc<Self::Pipeline>;
 	// TODO: consider switching to a slice instead
-	/// Get the resulting framebuffers of the GraphicalPass
+	/// Get the resulting framebuffers of the GraphicalPass.
 	fn framebuffers(&self) -> Vec<Arc<Self::Framebuffer>>;
 }
 
-/// Error during creation of the AlbedoPass
+/// Error during creation of the AlbedoPass.
 #[derive(Debug)]
 pub enum PassCreationError {
-	/// Error during creation of the underlying vulkan render-pass
+	/// Error during creation of the underlying vulkan render-pass.
 	RenderPass(RenderPassCreationError),
-	/// Error during creation of the underlying vulkan graphics-pipeline
+	/// Error during creation of the underlying vulkan graphics-pipeline.
 	GraphicsPipeline(GraphicsPipelineCreationError),
-	/// Error during initial resizing
+	/// Error during initial resizing.
 	Resize(ResizeError),
 }
 
@@ -141,6 +141,19 @@ impl AlbedoPass {
 		}).collect::<Vec<_>>();
 		Ok(())
 	}
+}
+
+#[cfg(feature = "expose-underlying-vulkano")]
+impl AlbedoPass {
+	/// Get the [vulkano render pass](RenderPassAbstract) used in [AlbedoPass].
+	#[inline(always)]
+	pub fn render_pass(&self) -> &Arc<dyn RenderPassAbstract + Send + Sync> { self.render_pass }
+	/// Get the [vulkano graphics pipeline](GraphicsPipelineAbstract) used in [AlbedoPass].
+	#[inline(always)]
+	pub fn graphics_pipeline(&self) -> &Arc<dyn GraphicsPipelineAbstract + Send + Sync> { self.graphics_pipeline }
+	/// Get the [vulkano dynamic state](DynamicState) used in [AlbedoPass].
+	#[inline(always)]
+	pub fn dynamic_state(&self) -> &DynamicState { self.dynamic_state }
 }
 
 impl From<RenderPassCreationError> for PassCreationError {

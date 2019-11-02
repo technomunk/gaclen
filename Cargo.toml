@@ -1,6 +1,6 @@
 [package]
 name = "gaclen"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
 edition = "2018"
 
@@ -12,6 +12,10 @@ license = "Apache-2.0 OR MIT"
 
 repository = "https://github.com/Griffone/gaclen"
 documentation = "https://docs.rs/gaclen"
+
+[features]
+# Expose underlying vulkano members to allow extending gaclen functionality
+expose-underlying-vulkano = []
 
 [dependencies]
 winit = "0.19.*" # window handling

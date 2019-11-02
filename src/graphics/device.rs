@@ -169,6 +169,25 @@ impl Device {
 	pub fn logical_device(&self) -> Arc<LogicalDevice> { self.device.clone() }
 }
 
+#[cfg(feature = "expose-underlying-vulkano")]
+impl Device {
+	/// Get the [vulkano device queue](DeviceQueue) used for graphical operations.
+	#[inline(always)]
+	pub fn graphics_queue(&self) -> &Arc<DeviceQueue> { self.graphics_queue }
+	/// Get the [vulkano device queue](DeviceQueue) used for transfer operations.
+	#[inline(always)]
+	pub fn transfer_queue(&self) -> &Arc<DeviceQueue> { self.transfer_queue }
+	/// Get the [vulkano device queue](DeviceQueue) used for compute operations.
+	#[inline(always)]
+	pub fn compute_queue(&self) -> &Arc<DeviceQueue> { self.compute_queue }
+	/// Get the [vulkano swapchian](Swapchain) used for presenting images on the screen.
+	#[inline(always)]
+	pub fn swapchain(&self) -> &Arc<Swapchain<Arc<Window>>> { self.swapchain }
+	/// Get the [vulkano swapchain images](SwapchainImage) that are presented on the screen.
+	#[inline(always)]
+	pub fn swapchain_images(&self) -> &Vec<Arc<SwapchainImage<Arc<Window>>>> { self.swapchain_images }
+}
+
 impl DrawingDevice {
 	/// Draw some data.
 	/// 

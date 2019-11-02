@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.6 Resizing Frames
+## 0.0.6 (pending)
 
 - **!BREAKING CHANGE!** refactors Drawing device into 2 sub-states:
   - *Frame* - active frame

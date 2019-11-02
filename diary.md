@@ -11,8 +11,8 @@ Decided to name it **gaclen**, short for **Ga**me **Cl**ient **En**gine, as it i
 Greg worked more on the project.
 
 - Created graphics module with context and device submodules.
-- Created initializeable graphics::context::Context object, an instance of Vulkan-driver context.
-- Created initializeable graphics::device::Device object, the core of using hardware accelerated rendering and computation.
+- Created initializable graphics::context::Context object, an instance of Vulkan-driver context.
+- Created initializable graphics::device::Device object, the core of using hardware accelerated rendering and computation.
 
 ## 19-10-2019
 
@@ -33,7 +33,12 @@ Greg published [gaclen](https://crates.io/crates/gaclen).
 
 ## 29-10-2019
 
-Greg imroved documentation, learning a bunch of lessons.
+Greg improved documentation, learning a bunch of lessons.
 
 - Improved documentation.
 - Created a [lessons](lessons.md) file that lists learned lessons and ideas from this project.
+
+## 02-11-2019
+
+Greg introduced changelog and 'expose-underlying-vulkano' feature.
+Since the changelog this diary is reserved for personal entries in free form.

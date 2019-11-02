@@ -16,7 +16,6 @@ pub struct Context {
 }
 
 impl Context {
-
 	/// Create a new instance of Context.
 	/// 
 	/// Will use blank application name and version.
@@ -30,11 +29,18 @@ impl Context {
 	// TODO: add a version with custom extensions
 }
 
+#[cfg(feature = "expose-underlying-vulkano")]
+impl Context {
+	/// Get the underlying [vulkano instance](Instance).
+	#[inline(always)]
+	pub fn instance(&self) -> &Arc<Instance> { self.instance }
+}
+
 impl Context {
 	fn create(
 		application_name: Option<&str>,
 		application_version: Option<Version>,
-		extenshions: InstanceExtensions
+		extensions: InstanceExtensions
 	) -> Result<Context, InstanceCreationError> {
 		let application_name: Option<Cow<str>> = match application_name {
 			Some(name) => Some(Cow::from(name)),
@@ -46,7 +52,7 @@ impl Context {
 			engine_name: Some(Cow::from(ENGINE_NAME)),
 			engine_version: Some(ENGINE_VERSION),
 		};
-		let instance = Instance::new(Some(&app_info), &extenshions, None)?;
+		let instance = Instance::new(Some(&app_info), &extensions, None)?;
 		Ok(Context { instance })
 	}
 }

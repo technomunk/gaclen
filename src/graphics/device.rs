@@ -25,6 +25,8 @@ use vulkano::instance::PhysicalDevice;
 use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
 
+pub use vulkano::swapchain::PresentMode;
+
 type ImageFormat = (vulkano::format::Format, vulkano::swapchain::ColorSpace);
 
 /// A device responsible for hardware-accelerated computations.
@@ -81,7 +83,7 @@ pub enum FrameFinishError {
 
 impl Device {
 	/// Create a new device that targets a specific window.
-	pub fn new(context: &Context, window: Arc<Window>) -> Result<Device, DeviceCreationError> {
+	pub fn new(context: &Context, window: Arc<Window>, present_mode: PresentMode) -> Result<Device, DeviceCreationError> {
 		let physical = select_physical_device(context)?;
 
 		let device_extensions = DeviceExtensions { khr_swapchain: true, .. DeviceExtensions::none() };
@@ -94,7 +96,7 @@ impl Device {
 			None => return Err(DeviceCreationError::UnsizedWindow),
 		};
 		let surface = vulkano_win::create_vk_surface(window, context.instance.clone())?;
-		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions.into(), &graphics_queue)?;
+		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions.into(), &graphics_queue, present_mode)?;
 
 		let device = Device {
 			device: logical,
@@ -272,7 +274,8 @@ fn create_swapchain(
 	logical_device: Arc<LogicalDevice>,
 	surface: Arc<Surface<Arc<Window>>>,
 	dimensions: (u32, u32),
-	graphics_queue: &Arc<DeviceQueue>
+	graphics_queue: &Arc<DeviceQueue>,
+	present_mode: vulkano::swapchain::PresentMode
 ) -> Result<(Arc<Swapchain<Arc<Window>>>, Vec<Arc<SwapchainImage<Arc<Window>>>>), DeviceCreationError> {
 	let capabilities = match surface.capabilities(physical_device) {
 		Ok(caps) => caps,
@@ -294,7 +297,7 @@ fn create_swapchain(
 		graphics_queue,
 		vulkano::swapchain::SurfaceTransform::Identity,
 		alpha,
-		vulkano::swapchain::PresentMode::Fifo,
+		present_mode,
 		true,
 		None);
 	match swapchain {

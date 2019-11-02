@@ -31,7 +31,7 @@ fn main() {
 	);
 	
 	let context = graphics::context::Context::new().unwrap();
-	let mut device = graphics::device::Device::new(&context, window.clone()).unwrap();
+	let mut device = graphics::device::Device::new(&context, window.clone(), gaclen::graphics::device::PresentMode::Immediate).unwrap();
 	println!("Initialized device: {:?}", device);
 
 	let mut pass = {

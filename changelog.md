@@ -2,7 +2,7 @@
 
 ## 0.0.5 PresentMode
 
-- allows different present modes for device swapchain **BREAKING CHANGE!**
+- **BREAKING CHANGE!** allows different present modes for device swapchain
 - re-exports vulkano-shader of compatible version with used vulkano
 
 ## 0.0.4 First 'Feature'

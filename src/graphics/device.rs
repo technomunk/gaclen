@@ -41,18 +41,26 @@ pub struct Device {
 
 	pub(super) swapchain: Arc<Swapchain<Arc<Window>>>,
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
+
+	pub(super) last_frame: Option<Box<dyn GpuFuture>>,
 }
 
 /// A device that is in the middle of drawing a frame.
-pub struct DrawingDevice {
+pub struct Frame {
 	device: Device,
 	time: Box<dyn GpuFuture>,
 	commands: AutoCommandBufferBuilder,
 	image_index: usize,
 }
 
+/// A device that is in the middle of a draw-pass in a middle of drawing a frame.
+pub struct PassInFrame<'a, GP: GraphicalPass> {
+	frame: Frame,
+	pass: &'a GP,
+}
+
 /// Error during device creation.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeviceCreationError {
 	/// No hardware devices were found.
 	NoPhysicalDevicesFound,
@@ -73,7 +81,7 @@ pub enum DeviceCreationError {
 }
 
 /// Error finishing the frame.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FrameFinishError {
 	/// Error during flushing commands to the GPU.
 	Flush(FlushError),
@@ -105,6 +113,7 @@ impl Device {
 			compute_queue,
 			swapchain,
 			swapchain_images,
+			last_frame: None,
 		};
 
 		Ok(device)
@@ -117,30 +126,26 @@ impl Device {
 			None => return Err(ResizeError::UnsizedWindow),
 		};
 
+		// TODO: investigate weird UnsupportedDimensions swapchain error on some resizes
 		let (swapchain, images) = self.swapchain.recreate_with_dimension([dimensions.0, dimensions.1])?;
 		self.swapchain = swapchain;
 		self.swapchain_images = images;
 		Ok(())
 	}
 
-	/// Start drawing the frame.
+	/// Begin drawing the frame.
 	/// 
-	/// Takes ownership of the [Device](struct.Device.html) and converts it to a [DrawingDevice](struct.DrawingDevice.html).
+	/// Takes ownership of the [Device](struct.Device.html) and converts it to a [Frame](struct.Frame.html).
 	/// This corresponds to switching to the special 'middle of frame' state, that caches intermediate commands before submitting them to the GPU.
-	/// To exit the state and get back the ownership of the [Device](struct.Device.html) call [finish_frame method](struct.DrawingDevice.html#method.finish_frame.html).
+	/// In order to draw after beginning the frame, one needs to [begin a pass](struct.Frame.html#method.begin_pass).
 	#[inline]
-	pub fn start_frame(
-		self,
-		when: Option<Box<dyn GpuFuture>>,
-		final_pass: &impl GraphicalPass,
-		clear_value: Vec<vulkano::format::ClearValue>
-	) -> Result<DrawingDevice, (Self, vulkano::swapchain::AcquireError)> {
+	pub fn begin_frame(mut self) -> Result<Frame, (Self, vulkano::swapchain::AcquireError)> {
 		let (image_index, image_acquire_time) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
 			Ok(result) => result,
 			Err(err) => return Err((self, err)),
 		};
 
-		let time: Box<dyn GpuFuture> = match when {
+		let time: Box<dyn GpuFuture> = match self.last_frame.take() {
 			Some(mut time) => {
 				time.cleanup_finished();
 				Box::new(time.join(image_acquire_time))
@@ -148,18 +153,15 @@ impl Device {
 			None => Box::new(vulkano::sync::now(self.device.clone()).join(image_acquire_time)),
 		};
 
-		let commands = {
-			AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap()
-				.begin_render_pass(final_pass.framebuffers()[image_index].clone(), false, clear_value).unwrap()
-		};
+		let commands = AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap();
 
-		let draw_device = DrawingDevice {
+		let frame = Frame {
 			device: self,
 			time,
 			commands,
-			image_index
+			image_index,
 		};
-		Ok(draw_device)
+		Ok(frame)
 	}
 
 	/// Create a basic buffer for data for processing on the GPU.
@@ -190,42 +192,66 @@ impl Device {
 	pub fn swapchain_images(&self) -> &Vec<Arc<SwapchainImage<Arc<Window>>>> { self.swapchain_images }
 }
 
-impl DrawingDevice {
-	/// Draw some data.
-	/// 
-	/// The exact result depends highly on the [GraphicalPass](traits.GraphicalPass.html) in question.
-	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
+impl Frame {
+	/// Begin using a given pass to draw.
+	///
+	/// Consumes the [Frame] to mark the new state.
 	#[inline]
-	pub fn draw<PC>(
-		self,
-		pass: &impl GraphicalPass,
-		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
-		push_constants: PC
-	) -> Self {
-		let commands = self.commands.draw(pass.pipeline(), pass.dynamic_state(), vertex_buffer, (), push_constants).unwrap();
-		DrawingDevice { commands, .. self }
+	pub fn begin_pass<'a, GP: GraphicalPass>(mut self, pass: &'a GP, clear_values: Vec<vulkano::format::ClearValue>) -> PassInFrame<'a, GP> {
+		self.commands = self.commands.begin_render_pass(pass.framebuffers()[self.image_index].clone(), false, clear_values).unwrap();
+		PassInFrame {
+			frame: self,
+			pass: pass,
+		}
 	}
 
 	/// Finish drawing the frame and flush the commands to the GPU.
-	/// Note that it does not block execution until the frame is done, rather providing a GpuFuture for when the frame will have been drawn.
+	/// 
+	/// Releases the Device to allow starting a new frame, allocate new resources and anything else a [Device] is able to do.
 	#[inline]
-	pub fn finish_frame(self) -> (Device, Result<Box<dyn GpuFuture>, FrameFinishError>) {
-		let commands = self.commands.end_render_pass().unwrap().build().unwrap();
+	pub fn finish_frame(self) -> Result<Device, (Device, FrameFinishError)> {
+		let commands = self.commands.build().unwrap();
 		let after_execute = match self.time.then_execute(self.device.graphics_queue.clone(), commands) {
 			Ok(future) => future,
-			Err(err) => return (self.device, Err(FrameFinishError::Commands(err))),
+			Err(err) => return Err((self.device, FrameFinishError::Commands(err))),
 		};
 
 		let after_flush = after_execute.then_swapchain_present(self.device.graphics_queue.clone(), self.device.swapchain.clone(), self.image_index)
 			.then_signal_fence_and_flush();
 		
-		match after_flush {
-			Ok(future) => (self.device, Ok(Box::new(future))),
-			Err(err) => (self.device, Err(FrameFinishError::Flush(err))),
-		}
+		let after_frame = match after_flush {
+			Ok(future) => future,
+			Err(err) => return Err((self.device, FrameFinishError::Flush(err))),
+		};
+		let device = Device { last_frame: Some(Box::new(after_frame)), .. self.device };
+		Ok(device)
 	}
 }
 
+impl<'a, GP: GraphicalPass> PassInFrame<'a, GP> {
+	/// Draw some data using a pass.
+	/// 
+	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
+	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
+	#[inline]
+	pub fn draw<PC>(
+		mut self,
+		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
+		push_constants: PC
+	) -> Self {
+		self.frame.commands = self.frame.commands.draw(self.pass.pipeline(), self.pass.dynamic_state(), vertex_buffer, (), push_constants).unwrap();
+		self
+	}
+
+	/// Finish using a GraphicalPass.
+	/// 
+	/// Releases the consumed [Frame] to begin the next pass or finish the frame.
+	#[inline]
+	pub fn finish_pass(self) -> Frame {
+		let commands = self.frame.commands.end_render_pass().unwrap();
+		Frame { commands, .. self.frame }
+	}
+}
 
 impl From<vulkano::device::DeviceCreationError> for DeviceCreationError {
 	fn from(err: vulkano::device::DeviceCreationError) -> DeviceCreationError { DeviceCreationError::Logical(err) }

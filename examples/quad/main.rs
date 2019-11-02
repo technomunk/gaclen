@@ -52,39 +52,39 @@ fn main() {
 	].iter().cloned()).unwrap();
 
 	let mut recreate_swapchain = false;
-	
-	let mut previous_frame_end: Option<Box<dyn vulkano::sync::GpuFuture>> = None;
 
 	let mut running = true;
 	while running {
 		if recreate_swapchain {
-			device.resize_for_window(&window).unwrap();
+			// Sometimes the swapchain fails to create :(
+			if let Err(graphics::ResizeError::Swapchain(_)) = device.resize_for_window(&window) {
+				println!("Failed to resize window, skipping frame!");
+				continue;
+			};
 			pass.resize_for_window(&device, &window).unwrap();
 			recreate_swapchain = false;
 		}
 
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f32(), window.get_inner_size().unwrap().into());
-		
-		let (updated_device, after_frame) = device.start_frame(previous_frame_end, &pass, vec![clear_color.into()]).unwrap()
-			.draw(&pass, vec![triangle_buffer.clone()], push_constants)
+
+		let after_frame = device.begin_frame().unwrap()
+			.begin_pass(&pass, vec![clear_color.into()])
+				.draw(vec![triangle_buffer.clone()], push_constants)
+				.finish_pass()
 			.finish_frame();
 		
-		device = updated_device;
-
-		match after_frame {
-			Ok(future) => previous_frame_end = Some(future),
-			Err(graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate)) => {
-				recreate_swapchain = true;
-				previous_frame_end = None;
+		device = match after_frame {
+			Ok(device) => device,
+			Err((device, err)) => {
+				if err == graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) {
+					recreate_swapchain = true;
+				};
+				device
 			},
-			Err(err) => {
-				println!("Error drawing: {:?}", err);
-				previous_frame_end = None;
-			}
 		};
 
-		frame_count = frame_count + 1;
+		frame_count += 1;
 
 		events_loop.poll_events(|event| {
 			match event {

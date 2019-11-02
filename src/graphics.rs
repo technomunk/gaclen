@@ -15,7 +15,7 @@ const ENGINE_NAME: &str = "gaclen";
 const ENGINE_VERSION: Version = Version { major: 0, minor: 0, patch: 0 };
 
 /// Error during resizing of viewports.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResizeError {
 	/// Error during recreation of the [Device](struct.Device) swapchain
 	Swapchain(vulkano::swapchain::SwapchainCreationError),

@@ -1,8 +1,16 @@
 # Changelog
 
+## 0.0.6 Resizing Frames
+
+- **!BREAKING CHANGE!** refactors Drawing device into 2 sub-states:
+  - *Frame* - active frame
+  - *PassInFrame* - an active graphical pass within a frame
+- changes the example to handle failing resizing device by skipping a frame
+- fixes continuous memory leak in the quad example
+
 ## 0.0.5 PresentMode
 
-- **BREAKING CHANGE!** allows different present modes for device swapchain
+- **!BREAKING CHANGE!** allows different present modes for device swapchain
 - re-exports vulkano-shader of compatible version with used vulkano
 
 ## 0.0.4 First 'Feature'

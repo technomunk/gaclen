@@ -13,6 +13,8 @@
 
 /// used for hardware acceleration.
 pub use vulkano;
+/// used for compiling shaders.
+pub use vulkano_shaders;
 /// used for OS integration.
 pub use winit;
 

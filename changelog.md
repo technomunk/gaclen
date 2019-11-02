@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.5 PresentMode
+
+- allows different present modes for device swapchain **BREAKING CHANGE!**
+- re-exports vulkano-shader of compatible version with used vulkano
+
 ## 0.0.4 First 'Feature'
 
 - introduces 'expose-underlying-vulkano' feature that exposes vulkano members of gaclen structs to allow for more flexibility

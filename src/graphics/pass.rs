@@ -197,7 +197,7 @@ impl AlbedoPass {
 				depth: {
 					load: Clear,
 					store: DontCare,
-					format: Format::D16Unorm,
+					format: device.depth_buffer.format(),
 					samples: 1,
 				}
 			},

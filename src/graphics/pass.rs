@@ -212,6 +212,7 @@ impl AlbedoPass {
 			.triangle_list()
 			.cull_mode_back()
 			.viewports_dynamic_scissors_irrelevant(1)
+			.depth_stencil_simple_depth()
 			.fragment_shader(fragment_shader, fssc)
 			.render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
 			.build(device.device.clone())?);

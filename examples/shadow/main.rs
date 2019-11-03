@@ -65,7 +65,7 @@ fn main() {
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 
 		let after_frame = device.begin_frame().unwrap()
-			.begin_pass(&albedo_pass, vec![clear_color.into()])
+			.begin_pass(&albedo_pass, vec![clear_color.into(), gaclen::vulkano::format::ClearValue::Depth(0.0)])
 				.draw(vec![quad.clone()], ())
 				.draw(vec![cube.clone()], ())
 				.finish_pass()

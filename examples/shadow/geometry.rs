@@ -4,8 +4,6 @@ use gaclen::vulkano::buffer::CpuAccessibleBuffer;
 
 use std::sync::Arc;
 
-pub type Mat4 = [[f32; 4]; 4];
-
 #[derive(Default, Debug, Clone)]
 pub struct Vertex {
 	pos: [f32; 3],
@@ -13,14 +11,6 @@ pub struct Vertex {
 }
 gaclen::vulkano::impl_vertex!(Vertex, pos, col);
 
-
-#[derive(Default, Debug, Clone)]
-pub struct Instance {
-	model_matrix: Mat4,
-	viewprojection_matrix: Mat4,
-	light_matrix: Mat4,
-}
-gaclen::vulkano::impl_vertex!(Instance, model_matrix, viewprojection_matrix, light_matrix);
 
 /// Generate a buffer with quad geometry.
 pub fn generate_quad(device: &Device) -> Arc<CpuAccessibleBuffer<[Vertex]>> {

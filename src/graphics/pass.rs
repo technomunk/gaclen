@@ -193,11 +193,17 @@ impl AlbedoPass {
 					store: Store,
 					format: device.swapchain.format(),
 					samples: 1,
+				},
+				depth: {
+					load: Clear,
+					store: DontCare,
+					format: Format::D16Unorm,
+					samples: 1,
 				}
 			},
 			pass: {
 				color: [color],
-				depth_stencil: {}
+				depth_stencil: {depth}
 			})?);
 
 		let graphics_pipeline = Arc::new(GraphicsPipeline::start()

@@ -1,24 +1,26 @@
 #version 450
 
-// Per-vertex input
-layout(location = 0) in vec3 in_position;
-layout(location = 1) in vec4 in_color;
+// per vertex input
+layout(location = 0) in vec3 position;
+layout(location = 1) in vec4 color;
 
-// Per-instance input
-// NOTE: mat4 takes up 4 location blocks, this will be caught by shaderc, but the error message is just about the overlap.
-layout(location = 2) in mat4 in_model_matrix;
-layout(location = 6) in mat4 in_viewprojection_matrix;
-layout(location = 10) in mat4 in_light_matrix; // view-projection matrix for the light source
+// uniforms
+layout(set = 0, binding = 0) uniform Model { mat4 model_matrix; } u_model;
+layout(set = 1, binding = 0) uniform Light { mat4 view_projection_matrix; } u_light;
 
-// Ouput
+layout(push_constant) uniform PushConstantData {
+	mat4 view_projection_matrix; // Camera view-projection matrix
+} pc;
+
+// ouput
 layout(location = 0) out vec4 out_pos_lightspace;
 layout(location = 1) out vec4 out_color;
 
 void main() {
-	vec4 world_pos = in_model_matrix * vec4(in_position, 1.0);
+	vec4 world_pos = u_model.model_matrix * vec4(position, 1.0);
 	
-	out_pos_lightspace = in_light_matrix * world_pos;
-	out_color = in_color;
+	out_pos_lightspace = u_light.view_projection_matrix * world_pos;
+	out_color = color;
 
-	gl_Position = in_viewprojection_matrix * world_pos;
+	gl_Position = pc.view_projection_matrix * world_pos;
 }

@@ -5,7 +5,7 @@ layout(location = 0) in vec4 in_pos_lightspace;
 layout(location = 1) in vec4 in_color;
 
 // Uniform
-layout(binding = 0) uniform sampler2D u_shadow;
+layout(set = 2, binding = 0) uniform sampler2D u_shadow;
 
 // Output
 layout(location = 0) out vec4 out_color;

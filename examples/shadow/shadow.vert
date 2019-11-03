@@ -1,11 +1,14 @@
 #version 450
 
-layout(location = 0) in vec3 position;
+// #include "light.glsl"
 
-layout(push_constant) uniform PushConstantData {
-	mat4 MVP;
-} pc;
+// per vertex input
+layout(location = 0) in vec3 in_position;
+
+// uniform
+layout(binding = 0) uniform Model { mat4 model_matrix; } u_model;
+layout(binding = 1) uniform Light { mat4 view_projection_matrix; } u_light;
 
 void main() {
-	gl_Position = pc.MVP * vec4(position, 1.0);
+	gl_Position = u_light.view_projection_matrix * u_model.model_matrix * vec4(in_position, 1.0);
 }

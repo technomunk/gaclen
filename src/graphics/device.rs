@@ -18,6 +18,8 @@ use super::pass::{GraphicalPass, PresentPass, DependentPass};
 use std::sync::Arc;
 
 use vulkano::buffer::{CpuAccessibleBuffer};
+use vulkano::format::Format;
+use vulkano::image::{AttachmentImage, ImageCreationError};
 use vulkano::framebuffer::{Framebuffer};
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
@@ -43,6 +45,7 @@ pub struct Device {
 
 	pub(super) swapchain: Arc<Swapchain<Arc<Window>>>,
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
+	pub(super) depth_buffer: Arc<AttachmentImage>,
 
 	pub(super) dynamic_state: DynamicState,
 
@@ -78,6 +81,8 @@ pub enum DeviceCreationError {
 	SurfaceCapabilities(vulkano::swapchain::CapabilitiesError),
 	/// Error during the creation of the swapchain.
 	Swapchain(SwapchainCreationError),
+	/// Error during the creation of the depth-buffer image.
+	Image(ImageCreationError),
 	/// No applicable format for draw-surface was found.
 	NoCompatibleFormatFound,
 	/// Window passed for the creation of the device has no apparent size..
@@ -112,6 +117,8 @@ impl Device {
 		let surface = vulkano_win::create_vk_surface(window, context.instance.clone())?;
 		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions, &graphics_queue, present_mode)?;
 
+		let depth_buffer = AttachmentImage::transient(logical.clone(), [dimensions.0, dimensions.1], Format::D16Unorm)?;
+
 		let dynamic_state = DynamicState::default();
 
 		let mut device = Device {
@@ -121,6 +128,7 @@ impl Device {
 			compute_queue,
 			swapchain,
 			swapchain_images,
+			depth_buffer,
 			dynamic_state,
 			last_frame: None,
 		};
@@ -208,7 +216,10 @@ impl Device {
 impl Frame {
 	/// Begin a PresentPass (the results will be visible on the screen).
 	pub fn begin_pass<'a, PP: PresentPass>(mut self, pass: &'a PP, clear_values: Vec<vulkano::format::ClearValue>) -> PassInFrame<'a, PP> {
-		let framebuffer = Framebuffer::start(pass.render_pass()).add(self.device.swapchain_images[self.image_index].clone()).unwrap().build().unwrap();
+		let framebuffer = Framebuffer::start(pass.render_pass())
+			.add(self.device.swapchain_images[self.image_index].clone()).unwrap()
+			.add(self.device.depth_buffer.clone()).unwrap()
+			.build().unwrap();
 		self.commands = self.commands.begin_render_pass(Arc::new(framebuffer), false, clear_values).unwrap();
 
 		PassInFrame {
@@ -270,6 +281,9 @@ impl From<vulkano::device::DeviceCreationError> for DeviceCreationError {
 }
 impl From<vulkano::swapchain::SurfaceCreationError> for DeviceCreationError {
 	fn from(err: vulkano::swapchain::SurfaceCreationError) -> DeviceCreationError { DeviceCreationError::Surface(err) }
+}
+impl From<ImageCreationError> for DeviceCreationError {
+	fn from(err: ImageCreationError) -> DeviceCreationError { DeviceCreationError::Image(err) }
 }
 
 impl std::fmt::Debug for Device {

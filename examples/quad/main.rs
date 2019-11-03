@@ -72,7 +72,7 @@ fn main() {
 		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f32(), window.get_inner_size().unwrap().into());
 
 		let after_frame = device.begin_frame().unwrap()
-			.begin_pass(&pass, vec![clear_color.into(), gaclen::vulkano::format::ClearValue::Depth(0.0)])
+			.begin_pass(&pass, vec![clear_color.into(), gaclen::vulkano::format::ClearValue::Depth(1.0)])
 				.draw(vec![triangle_buffer.clone()], push_constants)
 				.finish_pass()
 			.finish_frame();

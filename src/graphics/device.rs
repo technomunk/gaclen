@@ -45,7 +45,8 @@ pub struct Device {
 
 	pub(super) swapchain: Arc<Swapchain<Arc<Window>>>,
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
-	pub(super) depth_buffer: Arc<AttachmentImage>,
+	pub(super) swapchain_depths: Vec<Arc<AttachmentImage>>,
+	pub(super) swapchain_depth_format: Format,
 
 	pub(super) dynamic_state: DynamicState,
 
@@ -117,7 +118,16 @@ impl Device {
 		let surface = vulkano_win::create_vk_surface(window, context.instance.clone())?;
 		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions, &graphics_queue, present_mode)?;
 
-		let depth_buffer = AttachmentImage::transient(logical.clone(), [dimensions.0, dimensions.1], Format::D16Unorm)?;
+		let swapchain_depth_format = Format::D16Unorm;
+
+		let swapchain_depths = {
+			let image_count = swapchain_images.len();
+			let mut images = Vec::with_capacity(image_count);
+			for _ in 0..image_count {
+				images.push(AttachmentImage::transient(logical.clone(), [dimensions.0, dimensions.1], swapchain_depth_format)?);
+			};
+			images
+		};
 
 		let dynamic_state = DynamicState::default();
 
@@ -128,7 +138,8 @@ impl Device {
 			compute_queue,
 			swapchain,
 			swapchain_images,
-			depth_buffer,
+			swapchain_depths,
+			swapchain_depth_format,
 			dynamic_state,
 			last_frame: None,
 		};
@@ -218,7 +229,7 @@ impl Frame {
 	pub fn begin_pass<'a, PP: PresentPass>(mut self, pass: &'a PP, clear_values: Vec<vulkano::format::ClearValue>) -> PassInFrame<'a, PP> {
 		let framebuffer = Framebuffer::start(pass.render_pass())
 			.add(self.device.swapchain_images[self.image_index].clone()).unwrap()
-			.add(self.device.depth_buffer.clone()).unwrap()
+			.add(self.device.swapchain_depths[self.image_index].clone()).unwrap()
 			.build().unwrap();
 		self.commands = self.commands.begin_render_pass(Arc::new(framebuffer), false, clear_values).unwrap();
 
@@ -421,7 +432,7 @@ fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (
 	let viewport = Viewport {
 		origin: [ 0.0, dimensions.1 as f32],
 		dimensions: [dimensions.0 as f32, -(dimensions.1 as f32)],
-		depth_range: 0.0 .. 1.0,
+		depth_range: 1.0 .. 0.0,
 	};
 
 	match dynamic_state.viewports {

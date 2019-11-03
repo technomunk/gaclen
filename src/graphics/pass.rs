@@ -197,7 +197,7 @@ impl AlbedoPass {
 				depth: {
 					load: Clear,
 					store: DontCare,
-					format: device.depth_buffer.format(),
+					format: device.swapchain_depth_format,
 					samples: 1,
 				}
 			},
@@ -212,8 +212,8 @@ impl AlbedoPass {
 			.triangle_list()
 			.cull_mode_back()
 			.viewports_dynamic_scissors_irrelevant(1)
-			.depth_stencil_simple_depth()
 			.fragment_shader(fragment_shader, fssc)
+			.depth_stencil_simple_depth()
 			.render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
 			.build(device.device.clone())?);
 		

@@ -13,12 +13,14 @@
 use crate::window::Window;
 use super::context::Context;
 use super::ResizeError;
-use super::pass::GraphicalPass;
+use super::pass::{GraphicalPass, PresentPass, DependentPass};
 
 use std::sync::Arc;
 
 use vulkano::buffer::{CpuAccessibleBuffer};
-use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError};
+use vulkano::framebuffer::{Framebuffer};
+use vulkano::pipeline::viewport::Viewport;
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
 use vulkano::image::SwapchainImage;
 use vulkano::instance::PhysicalDevice;
@@ -41,6 +43,8 @@ pub struct Device {
 
 	pub(super) swapchain: Arc<Swapchain<Arc<Window>>>,
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
+
+	pub(super) dynamic_state: DynamicState,
 
 	pub(super) last_frame: Option<Box<dyn GpuFuture>>,
 }
@@ -90,7 +94,9 @@ pub enum FrameFinishError {
 }
 
 impl Device {
-	/// Create a new device that targets a specific window.
+	// TODO: add create() function with all parameters and use with_* for setting individual non-default parameters and new() with all default parameters.
+
+	/// Create a new device with default parameters.
 	pub fn new(context: &Context, window: Arc<Window>, present_mode: PresentMode) -> Result<Device, DeviceCreationError> {
 		let physical = select_physical_device(context)?;
 
@@ -99,22 +105,27 @@ impl Device {
 		let (logical, queues) = LogicalDevice::new(physical, physical.supported_features(), &device_extensions, queues.iter().cloned())?;
 		let [graphics_queue, transfer_queue, compute_queue] = unpack_queues(queues.collect());
 
-		let dimensions = match window.get_inner_size() {
-			Some(size) => size,
+		let dimensions: (u32, u32) = match window.get_inner_size() {
+			Some(size) => size.into(),
 			None => return Err(DeviceCreationError::UnsizedWindow),
 		};
 		let surface = vulkano_win::create_vk_surface(window, context.instance.clone())?;
-		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions.into(), &graphics_queue, present_mode)?;
+		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions, &graphics_queue, present_mode)?;
 
-		let device = Device {
+		let dynamic_state = DynamicState::default();
+
+		let mut device = Device {
 			device: logical,
 			graphics_queue,
 			transfer_queue,
 			compute_queue,
 			swapchain,
 			swapchain_images,
+			dynamic_state,
 			last_frame: None,
 		};
+
+		resize_dynamic_state_viewport(&mut device.dynamic_state, dimensions);
 
 		Ok(device)
 	}
@@ -125,6 +136,8 @@ impl Device {
 			Some(size) => size.into(),
 			None => return Err(ResizeError::UnsizedWindow),
 		};
+
+		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions);
 
 		// TODO: investigate weird UnsupportedDimensions swapchain error on some resizes
 		let (swapchain, images) = self.swapchain.recreate_with_dimension([dimensions.0, dimensions.1])?;
@@ -193,12 +206,11 @@ impl Device {
 }
 
 impl Frame {
-	/// Begin using a given pass to draw.
-	///
-	/// Consumes the [Frame] to mark the new state.
-	#[inline]
-	pub fn begin_pass<'a, GP: GraphicalPass>(mut self, pass: &'a GP, clear_values: Vec<vulkano::format::ClearValue>) -> PassInFrame<'a, GP> {
-		self.commands = self.commands.begin_render_pass(pass.framebuffers()[self.image_index].clone(), false, clear_values).unwrap();
+	/// Begin a PresentPass (the results will be visible on the screen).
+	pub fn begin_pass<'a, PP: PresentPass>(mut self, pass: &'a PP, clear_values: Vec<vulkano::format::ClearValue>) -> PassInFrame<'a, PP> {
+		let framebuffer = Framebuffer::start(pass.render_pass()).add(self.device.swapchain_images[self.image_index].clone()).unwrap().build().unwrap();
+		self.commands = self.commands.begin_render_pass(Arc::new(framebuffer), false, clear_values).unwrap();
+
 		PassInFrame {
 			frame: self,
 			pass: pass,
@@ -239,7 +251,7 @@ impl<'a, GP: GraphicalPass> PassInFrame<'a, GP> {
 		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
 		push_constants: PC
 	) -> Self {
-		self.frame.commands = self.frame.commands.draw(self.pass.pipeline(), self.pass.dynamic_state(), vertex_buffer, (), push_constants).unwrap();
+		self.frame.commands = self.frame.commands.draw(self.pass.pipeline(), &self.frame.device.dynamic_state, vertex_buffer, (), push_constants).unwrap();
 		self
 	}
 
@@ -325,7 +337,9 @@ fn create_swapchain(
 		alpha,
 		present_mode,
 		true,
-		None);
+		None
+	);
+	
 	match swapchain {
 		Ok(swapchain) => Ok(swapchain),
 		Err(err) => Err(DeviceCreationError::Swapchain(err)),
@@ -387,6 +401,24 @@ fn unpack_queues(mut queues: Vec<Arc<DeviceQueue>>) -> [Arc<DeviceQueue>; 3] {
 		},
 		_ => panic!("Unexpected number of queues created, something wend wrong during device initialization.")
 	}
+}
+
+fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (u32, u32)) {
+	let viewport = Viewport {
+		origin: [ 0.0, dimensions.1 as f32],
+		dimensions: [dimensions.0 as f32, -(dimensions.1 as f32)],
+		depth_range: 0.0 .. 1.0,
+	};
+
+	match dynamic_state.viewports {
+		Some(ref mut vec) => {
+			match vec.len() {
+				0 => vec.push(viewport),
+				_ => vec[0] = viewport,
+			}
+		},
+		None => dynamic_state.viewports = Some(vec![viewport]),
+	};
 }
 
 fn validate_physical_device<'a>(device: &PhysicalDevice<'a>) -> bool {

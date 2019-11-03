@@ -6,6 +6,8 @@
   - *Frame* - active frame
   - *PassInFrame* - an active graphical pass within a frame
 - changes the example to handle failing resizing device by skipping a frame
+- update *'vulkano'* dependency to 0.16.0
+- move *'vulkano-shaders'* dependency to dev (not propagated further)
 
 ## 0.0.5 PresentMode
 

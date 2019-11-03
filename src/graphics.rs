@@ -12,6 +12,7 @@ pub use vulkano::instance::Version;
 
 const REQUIRED_VULKAN_VERSION: Version = Version { major: 1, minor: 0, patch: 0 };
 const ENGINE_NAME: &str = "gaclen";
+// Graphical engine version. Is allowed to differ from gaclen cargo version.
 const ENGINE_VERSION: Version = Version { major: 0, minor: 0, patch: 0 };
 
 /// Error during resizing of viewports.

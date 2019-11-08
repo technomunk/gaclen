@@ -4,7 +4,7 @@ mod shaders;
 
 use gaclen::graphics;
 
-use gaclen::winit::{
+use gaclen::window::{
 	WindowBuilder,
 	EventsLoop,
 	Event, WindowEvent,
@@ -15,7 +15,7 @@ struct Vertex {
 	position: [f32; 3],
 	color: [f32; 4],
 }
-vulkano::impl_vertex!(Vertex, position, color);
+gaclen::graphics::impl_vertex!(Vertex, position, color);
 
 fn main() {
 	let mut frame_count: u64 = 0;
@@ -72,7 +72,7 @@ fn main() {
 		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f32(), window.get_inner_size().unwrap().into());
 
 		let after_frame = device.begin_frame().unwrap()
-			.begin_pass(&pass, vec![clear_color.into(), gaclen::vulkano::format::ClearValue::Depth(1.0)])
+			.begin_pass(&pass, vec![clear_color.into(), gaclen::graphics::vulkano::format::ClearValue::Depth(1.0)])
 				.draw(vec![triangle_buffer.clone()], push_constants)
 				.finish_pass()
 			.finish_frame();
@@ -80,7 +80,7 @@ fn main() {
 		device = match after_frame {
 			Ok(device) => device,
 			Err((device, err)) => {
-				if err == graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
+				if err == graphics::device::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
 				device
 			},
 		};

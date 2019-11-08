@@ -8,6 +8,10 @@ pub mod context;
 pub mod device;
 pub mod pass;
 
+/// used for hardware acceleration.
+pub use vulkano;
+#[macro_use(impl_vertex)]
+pub use vulkano::impl_vertex;
 pub use vulkano::instance::Version;
 
 const REQUIRED_VULKAN_VERSION: Version = Version { major: 1, minor: 0, patch: 0 };

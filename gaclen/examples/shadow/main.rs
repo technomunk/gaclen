@@ -5,7 +5,7 @@ mod geometry;
 
 use gaclen::graphics;
 
-use gaclen::winit::{
+use gaclen::window::{
 	WindowBuilder,
 	EventsLoop,
 	Event, WindowEvent,

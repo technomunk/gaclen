@@ -11,10 +11,5 @@
 //! - The library is in active development and has limited functionality at the moment.
 //! - Members exposes with 'expose-underlying-vulkano' feature use [nightly documentation](https://github.com/rust-lang/rust/issues/43466). The links will be broken.
 
-/// used for hardware acceleration.
-pub use vulkano;
-/// used for OS integration.
-pub use winit;
-
 pub mod window;
 pub mod graphics;

@@ -7,7 +7,13 @@
   - *PassInFrame* - an active graphical pass within a frame
 - changes the example to handle failing resizing device by skipping a frame
 - update *'vulkano'* dependency to 0.16.0
-- move *'vulkano-shaders'* dependency to dev (not propagated further)
+- move re-exports to sub-projects
+  - vulkano is now exported by gaclen::graphics
+  - winit is now exported by gaclen::window
+  - gaclen::window also directly exports winit items
+- create a split gaclen_shader project that re-exports a tweaked version of vulkano_shader! macro
+  - this drops the necessity of depending on vulkano
+  - vulkano can be used from gaclen::graphics::vulkano
 
 ## 0.0.5 PresentMode
 

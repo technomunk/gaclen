@@ -1,6 +1,6 @@
 use gaclen::graphics::device::Device;
 
-use gaclen::vulkano::buffer::CpuAccessibleBuffer;
+use gaclen::graphics::vulkano::buffer::CpuAccessibleBuffer;
 
 use std::sync::Arc;
 
@@ -9,7 +9,7 @@ pub struct Vertex {
 	pos: [f32; 3],
 	col: [f32; 4],
 }
-gaclen::vulkano::impl_vertex!(Vertex, pos, col);
+gaclen::graphics::impl_vertex!(Vertex, pos, col);
 
 
 /// Generate a buffer with quad geometry.

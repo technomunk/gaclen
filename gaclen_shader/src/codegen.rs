@@ -1,3 +1,5 @@
+// The only changes from the vulkano-shaders is using crate::gaclen::graphics::vulkano instead of vulkano in the generated code
+
 // Copyright (c) 2016 The vulkano developers
 // Licensed under the Apache License, Version 2.0
 // <LICENSE-APACHE or
@@ -6,8 +8,6 @@
 // at your option. All files in the project carrying such
 // notice may not be copied, modified, or distributed except
 // according to those terms.
-
-// The only changes from the vulkano-shaders is using crate::gaclen::graphics::vulkano instead of vulkano in the generated code
 
 use std::io::Error as IoError;
 use std::path::Path;
@@ -203,59 +203,64 @@ pub fn reflect(name: &str, spirv: &[u32], dump: bool) -> Result<TokenStream, Err
     let ast = quote!{
         use std::sync::Arc;
         use crate::gaclen::graphics::device::Device as GaclenDevice;
-        // use crate::gaclen::vulkano;
-
+        
         #[allow(unused_imports)]
         use std::vec::IntoIter as VecIntoIter;
-
+        
+        use crate::gaclen::graphics::vulkano;
         #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor::DescriptorDesc;
+        use vulkano::OomError;
         #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor::DescriptorDescTy;
+        use vulkano::format::Format;
         #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor::DescriptorBufferDesc;
+        use vulkano::descriptor::descriptor::{
+            DescriptorDesc,
+            DescriptorDescTy,
+            DescriptorBufferDesc,
+            DescriptorImageDesc,
+            DescriptorImageDescDimensions,
+            DescriptorImageDescArray,
+            ShaderStages,
+        };
         #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor::DescriptorImageDesc;
+        use vulkano::descriptor::descriptor_set::{
+            DescriptorSet,
+            UnsafeDescriptorSet,
+            UnsafeDescriptorSetLayout,
+        };
         #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor::DescriptorImageDescDimensions;
+        use vulkano::descriptor::pipeline_layout::{
+            PipelineLayout,
+            PipelineLayoutDesc,
+            PipelineLayoutDescPcRange,
+        };
         #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor::DescriptorImageDescArray;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor::ShaderStages;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor_set::DescriptorSet;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor_set::UnsafeDescriptorSet;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::descriptor_set::UnsafeDescriptorSetLayout;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::pipeline_layout::PipelineLayout;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::pipeline_layout::PipelineLayoutDesc;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::descriptor::pipeline_layout::PipelineLayoutDescPcRange;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::pipeline::shader::SpecializationConstants as SpecConstsTrait;
-        #[allow(unused_imports)]
-        use crate::gaclen::graphics::vulkano::pipeline::shader::SpecializationMapEntry;
+        use vulkano::pipeline::shader::{
+            ShaderModule,
+            SpecializationConstants as SpecConstsTrait,
+            SpecializationMapEntry,
+            GraphicsEntryPoint,
+            GraphicsShaderType,
+            ShaderInterfaceDef,
+            ShaderInterfaceDefEntry,
+            ComputeEntryPoint,
+            GeometryShaderExecutionMode,
+        };
 
         pub struct #struct_name {
-            shader: Arc<crate::gaclen::graphics::vulkano::pipeline::shader::ShaderModule>,
+            shader: Arc<ShaderModule>,
         }
 
         impl #struct_name {
             /// Loads the shader in Vulkan as a `ShaderModule`.
             #[inline]
             #[allow(unsafe_code)]
-            pub fn load(device: &GaclenDevice)
-                        -> Result<#struct_name, crate::gaclen::graphics::vulkano::OomError>
-            {
+            pub fn load(device: &GaclenDevice) -> Result<#struct_name, OomError> {
                 #( #cap_checks )*
                 let words = [ #( #spirv ),* ];
-
                 unsafe {
                     Ok(#struct_name {
-                        shader: crate::gaclen::graphics::vulkano::pipeline::shader::ShaderModule::from_words(device.logical_device().clone(), &words)?
+                        shader: ShaderModule::from_words(device.logical_device().clone(), &words)?
                     })
                 }
             }
@@ -263,7 +268,7 @@ pub fn reflect(name: &str, spirv: &[u32], dump: bool) -> Result<TokenStream, Err
             /// Returns the module that was created.
             #[allow(dead_code)]
             #[inline]
-            pub fn module(&self) -> &Arc<crate::gaclen::graphics::vulkano::pipeline::shader::ShaderModule> {
+            pub fn module(&self) -> &Arc<ShaderModule> {
                 &self.shader
             }
 

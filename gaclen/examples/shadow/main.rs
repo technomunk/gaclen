@@ -36,8 +36,8 @@ fn main() {
 	println!("Initialized device: {:?}", device);
 
 	let albedo_pass = {
-		let vs = shaders::albedo::vertex::Shader::load(device.logical_device()).unwrap();
-		let fs = shaders::albedo::fragment::Shader::load(device.logical_device()).unwrap();
+		let vs = shaders::albedo::vertex::Shader::load(&device).unwrap();
+		let fs = shaders::albedo::fragment::Shader::load(&device).unwrap();
 
 		graphics::pass::AlbedoPass::new::<_, _, Vertex>(&device, vs.main_entry_point(), (), fs.main_entry_point(), ()).unwrap()
 	};

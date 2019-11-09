@@ -56,6 +56,8 @@ pub enum PassCreationError {
 	IncorrectFormat,
 }
 
+// TODO: create a GraphicalPassBuilder
+
 /// Shadow pass renders geometry to a depth buffer.
 /// 
 /// The depth buffer can then be used to calculate whether a fragment is within view of the light source or not.

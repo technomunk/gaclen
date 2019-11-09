@@ -25,4 +25,4 @@ vulkano-win = "0.16.0" # vulkan-winit linkage
 
 [dev-dependencies]
 cgmath = "0.17.0" # linear algebra library
-vulkano-shaders = "0.16.0" # inline shader library
+gaclen_shader = { path = "../gaclen_shader" }

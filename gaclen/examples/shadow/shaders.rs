@@ -1,12 +1,12 @@
 pub mod shadow {
 	pub mod vertex {
-		vulkano_shaders::shader!{
+		gaclen_shader::shader!{
 			ty: "vertex",
 			path: "examples/shadow/shadow.vert",
 		}
 	}
 	pub mod fragment {
-		vulkano_shaders::shader!{
+		gaclen_shader::shader!{
 			ty: "fragment",
 			path: "examples/shadow/shadow.frag",
 		}
@@ -14,13 +14,13 @@ pub mod shadow {
 }
 pub mod albedo {
 	pub mod vertex {
-		vulkano_shaders::shader!{
+		gaclen_shader::shader!{
 			ty: "vertex",
 			path: "examples/shadow/albedo.vert",
 		}
 	}
 	pub mod fragment {
-		vulkano_shaders::shader!{
+		gaclen_shader::shader!{
 			ty: "fragment",
 			path: "examples/shadow/albedo.frag",
 		}

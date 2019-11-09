@@ -162,6 +162,16 @@ impl Device {
 		let (swapchain, images) = self.swapchain.recreate_with_dimension([dimensions.0, dimensions.1])?;
 		self.swapchain = swapchain;
 		self.swapchain_images = images;
+
+		self.swapchain_depths = {
+			let image_count = self.swapchain_images.len();
+			let mut images = Vec::with_capacity(image_count);
+			for _ in 0..image_count {
+				images.push(AttachmentImage::transient(self.device.clone(), [dimensions.0, dimensions.1], self.swapchain_depth_format)?);
+			};
+			images
+		};
+
 		Ok(())
 	}
 
@@ -434,7 +444,7 @@ fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (
 		dimensions: [dimensions.0 as f32, -(dimensions.1 as f32)],
 		depth_range: 1.0 .. 0.0,
 	};
-
+	
 	match dynamic_state.viewports {
 		Some(ref mut vec) => {
 			match vec.len() {

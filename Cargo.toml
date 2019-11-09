@@ -3,3 +3,4 @@ members = [
 	"gaclen",
 	"gaclen_shader",
 ]
+default-members = ["gaclen"]

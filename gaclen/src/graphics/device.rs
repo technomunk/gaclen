@@ -13,14 +13,14 @@
 use crate::window::Window;
 use super::context::Context;
 use super::ResizeError;
-use super::pass::{GraphicalPass, PresentPass, DependentPass};
+use super::pass::{GraphicalPass, PresentPass};
 
 use std::sync::Arc;
 
 use vulkano::buffer::{CpuAccessibleBuffer};
 use vulkano::format::Format;
 use vulkano::image::{AttachmentImage, ImageCreationError};
-use vulkano::framebuffer::{Framebuffer};
+use vulkano::framebuffer::{Framebuffer, RenderPassAbstract};
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
@@ -28,6 +28,7 @@ use vulkano::image::SwapchainImage;
 use vulkano::instance::PhysicalDevice;
 use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
+use vulkano::pipeline::GraphicsPipelineAbstract;
 
 pub use vulkano::swapchain::PresentMode;
 
@@ -62,9 +63,9 @@ pub struct Frame {
 }
 
 /// A device that is in the middle of a draw-pass in a middle of drawing a frame.
-pub struct PassInFrame<'a, GP: GraphicalPass> {
+pub struct PassInFrame<'a, P, RP, I, PP> {
 	frame: Frame,
-	pass: &'a GP,
+	pass: &'a GraphicalPass<P, RP, I, PP>,
 }
 
 /// Error during device creation.
@@ -236,8 +237,15 @@ impl Device {
 
 impl Frame {
 	/// Begin a PresentPass (the results will be visible on the screen).
-	pub fn begin_pass<'a, PP: PresentPass>(mut self, pass: &'a PP, clear_values: Vec<vulkano::format::ClearValue>) -> PassInFrame<'a, PP> {
-		let framebuffer = Framebuffer::start(pass.render_pass())
+	pub fn begin_pass<'a, P, RP, I>(
+		mut self,
+		pass: &'a GraphicalPass<P, RP, I, PresentPass>,
+		clear_values: Vec<vulkano::format::ClearValue>)
+	-> PassInFrame<'a, P, RP, I, PresentPass>
+	where
+		RP : RenderPassAbstract + Send + Sync + 'static,
+	{
+		let framebuffer = Framebuffer::start(pass.render_pass.clone())
 			.add(self.device.swapchain_images[self.image_index].clone()).unwrap()
 			.add(self.device.swapchain_depths[self.image_index].clone()).unwrap()
 			.build().unwrap();
@@ -272,7 +280,10 @@ impl Frame {
 	}
 }
 
-impl<'a, GP: GraphicalPass> PassInFrame<'a, GP> {
+impl<'a, Pl, P, I, PP> PassInFrame<'a, Pl, P, I, PP>
+where
+	Pl : GraphicsPipelineAbstract + Send + Sync + 'static,
+{
 	/// Draw some data using a pass.
 	/// 
 	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
@@ -283,7 +294,7 @@ impl<'a, GP: GraphicalPass> PassInFrame<'a, GP> {
 		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
 		push_constants: PC
 	) -> Self {
-		self.frame.commands = self.frame.commands.draw(self.pass.pipeline(), &self.frame.device.dynamic_state, vertex_buffer, (), push_constants).unwrap();
+		self.frame.commands = self.frame.commands.draw(self.pass.pipeline.clone(), &self.frame.device.dynamic_state, vertex_buffer, (), push_constants).unwrap();
 		self
 	}
 

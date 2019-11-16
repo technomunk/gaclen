@@ -39,7 +39,13 @@ fn main() {
 		let vs = shaders::albedo::vertex::Shader::load(&device).unwrap();
 		let fs = shaders::albedo::fragment::Shader::load(&device).unwrap();
 
-		graphics::pass::AlbedoPass::new::<_, _, Vertex>(&device, vs.main_entry_point(), (), fs.main_entry_point(), ()).unwrap()
+		graphics::pass::GraphicalPass::start()
+			.single_buffer_input::<Vertex>()
+			.vertex_shader(vs.main_entry_point(), ())
+			.fragment_shader(fs.main_entry_point(), ())
+			.build_present_pass(&device).unwrap()
+
+		// graphics::pass::AlbedoPass::new::<_, _, Vertex>(&device, vs.main_entry_point(), (), fs.main_entry_point(), ()).unwrap()
 	};
 
 	let quad = geometry::generate_quad(&device);

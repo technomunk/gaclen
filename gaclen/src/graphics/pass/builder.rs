@@ -57,7 +57,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	}
 
 	pub fn vertex_shader<S, SC>(self, shader: S, specialization: SC)
-	-> GraphicalPassBuilder<VI, S, S::SpecializationConstants, FS, FSS> 
+	-> GraphicalPassBuilder<VI, S, SC, FS, FSS> 
 	where
 		S : GraphicsEntryPointAbstract<SpecializationConstants = SC>,
 		SC : SpecializationConstants,
@@ -71,9 +71,11 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 		}
 	}
 
-	pub fn fragment_shader<S>(self, shader: S, specialization: S::SpecializationConstants)
-	-> GraphicalPassBuilder<VI, VS, VSS, S, S::SpecializationConstants>
-	where S : GraphicsEntryPointAbstract
+	pub fn fragment_shader<S, SC>(self, shader: S, specialization: SC)
+	-> GraphicalPassBuilder<VI, VS, VSS, S, SC>
+	where
+		S : GraphicsEntryPointAbstract<SpecializationConstants = SC>,
+		SC : SpecializationConstants,
 	{
 		GraphicalPassBuilder {
 			vertex_input: self.vertex_input,
@@ -85,7 +87,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	}
 }
 
-impl<'a, V, VS, FS> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VS::SpecializationConstants, FS, FS::SpecializationConstants>
+impl<V, VS, FS> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VS::SpecializationConstants, FS, FS::SpecializationConstants>
 where
 	VS : GraphicsEntryPointAbstract,
 	FS : GraphicsEntryPointAbstract,

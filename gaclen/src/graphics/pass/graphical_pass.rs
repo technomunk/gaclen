@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub struct PresentPass();
 
 /// A GraphicalPass produces some images as its result.
-pub struct GraphicalPass<P, RP, I, PP> {
+pub struct GraphicalPass<P : ?Sized, RP : ?Sized, I, PP> {
 	pub(in crate::graphics) pipeline: Arc<P>,
 	pub(in crate::graphics) render_pass: Arc<RP>,
 	pub(in crate::graphics) images: I,
@@ -19,5 +19,5 @@ pub struct GraphicalPass<P, RP, I, PP> {
 }
 
 impl GraphicalPass<(), (), (), ()> {
-	pub fn start<'a>() -> GraphicalPassBuilder<(), (), (), (), ()> { GraphicalPassBuilder::new() }
+	pub fn start() -> GraphicalPassBuilder<(), (), (), (), ()> { GraphicalPassBuilder::new() }
 }

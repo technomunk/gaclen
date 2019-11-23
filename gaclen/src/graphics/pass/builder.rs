@@ -87,15 +87,20 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	}
 }
 
-impl<V, VS, FS> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VS::SpecializationConstants, FS, FS::SpecializationConstants>
+impl<V, VS, VSS, FS, FSS> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VSS, FS, FSS>
 where
-	VS : GraphicsEntryPointAbstract,
-	FS : GraphicsEntryPointAbstract,
+	VS : GraphicsEntryPointAbstract<SpecializationConstants=VSS>,
+	FS : GraphicsEntryPointAbstract<SpecializationConstants=FSS>,
+	VSS : SpecializationConstants,
+	FSS : SpecializationConstants,
 	VS::PipelineLayout : Send + Sync + Clone + 'static,
 	FS::PipelineLayout : Send + Sync + Clone + 'static,
 	SingleBufferDefinition<V> : VertexDefinition<VS::InputDefinition>,
+	V : Send + Sync + 'static,
 {
-	pub fn build_present_pass(self, device: &Device) -> Result<GraphicalPass<impl GraphicsPipelineAbstract, impl RenderPassAbstract, (), PresentPass>, BuildError> {
+	// TODO: Figure out if these can be switched to static dispatch (impl instead of dyn)
+	pub fn build_present_pass(self, device: &Device)
+	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync, dyn RenderPassAbstract + Send + Sync, (), PresentPass>, BuildError> {
 		let render_pass = Arc::new(vulkano::single_pass_renderpass!(
 			device.device.clone(),
 			attachments: {

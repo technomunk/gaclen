@@ -63,7 +63,7 @@ pub struct Frame {
 }
 
 /// A device that is in the middle of a draw-pass in a middle of drawing a frame.
-pub struct PassInFrame<'a, P, RP, I, PP> {
+pub struct PassInFrame<'a, P : ?Sized, RP : ?Sized, I, PP> {
 	frame: Frame,
 	pass: &'a GraphicalPass<P, RP, I, PP>,
 }
@@ -243,7 +243,8 @@ impl Frame {
 		clear_values: Vec<vulkano::format::ClearValue>)
 	-> PassInFrame<'a, P, RP, I, PresentPass>
 	where
-		RP : RenderPassAbstract + Send + Sync + 'static,
+		P : ?Sized,
+		RP : ?Sized + RenderPassAbstract + Send + Sync + 'static,
 	{
 		let framebuffer = Framebuffer::start(pass.render_pass.clone())
 			.add(self.device.swapchain_images[self.image_index].clone()).unwrap()
@@ -280,9 +281,10 @@ impl Frame {
 	}
 }
 
-impl<'a, Pl, P, I, PP> PassInFrame<'a, Pl, P, I, PP>
+impl<'a, P, RP, I> PassInFrame<'a, P, RP, I, PresentPass>
 where
-	Pl : GraphicsPipelineAbstract + Send + Sync + 'static,
+	P : ?Sized + GraphicsPipelineAbstract + Send + Sync + 'static,
+	RP : ?Sized,
 {
 	/// Draw some data using a pass.
 	/// 

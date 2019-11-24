@@ -4,7 +4,7 @@ mod shaders;
 
 use gaclen::graphics;
 
-use winit::{
+use gaclen::window::{
 	WindowBuilder,
 	EventsLoop,
 	Event, WindowEvent,
@@ -15,7 +15,7 @@ struct Vertex {
 	position: [f32; 3],
 	color: [f32; 4],
 }
-vulkano::impl_vertex!(Vertex, position, color);
+gaclen::graphics::impl_vertex!(Vertex, position, color);
 
 fn main() {
 	let mut frame_count: u64 = 0;
@@ -31,14 +31,18 @@ fn main() {
 	);
 	
 	let context = graphics::context::Context::new().unwrap();
-	let mut device = graphics::device::Device::new(&context, window.clone(), gaclen::graphics::device::PresentMode::Immediate).unwrap();
+	let mut device = graphics::device::Device::new(&context, window.clone(), graphics::device::PresentMode::Immediate).unwrap();
 	println!("Initialized device: {:?}", device);
 
-	let mut pass = {
-		let vs = shaders::vertex::Shader::load(device.logical_device()).unwrap();
-		let fs = shaders::fragment::Shader::load(device.logical_device()).unwrap();
+	let pass = {
+		let vs = shaders::vertex::Shader::load(&device).unwrap();
+		let fs = shaders::fragment::Shader::load(&device).unwrap();
 
-		graphics::pass::AlbedoPass::new::<_, _, Vertex>(&device, &window, vs.main_entry_point(), (), fs.main_entry_point(), ()).unwrap()
+		graphics::pass::GraphicalPass::start()
+			.single_buffer_input::<Vertex>()
+			.vertex_shader(vs.main_entry_point(), ())
+			.fragment_shader(fs.main_entry_point(), ())
+			.build_present_pass(&device).unwrap()
 	};
 
 	let triangle_buffer = device.create_buffer([
@@ -52,39 +56,40 @@ fn main() {
 	].iter().cloned()).unwrap();
 
 	let mut recreate_swapchain = false;
-	
-	let mut previous_frame_end: Option<Box<dyn vulkano::sync::GpuFuture>> = None;
 
 	let mut running = true;
 	while running {
 		if recreate_swapchain {
-			device.resize_for_window(&window).unwrap();
-			pass.resize_for_window(&device, &window).unwrap();
+			// Sometimes the swapchain fails to create :(
+			match device.resize_for_window(&window) {
+				Ok(()) => (),
+				Err(graphics::ResizeError::Swapchain(_)) => {
+					println!("Failed to resize window, skipping frame!");
+					continue;
+				},
+				Err(err) => panic!(err),
+			};
 			recreate_swapchain = false;
 		}
 
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f32(), window.get_inner_size().unwrap().into());
-		
-		let (updated_device, after_frame) = device.start_frame(previous_frame_end, &pass, vec![clear_color.into()]).unwrap()
-			.draw(&pass, vec![triangle_buffer.clone()], push_constants)
+
+		let after_frame = device.begin_frame().unwrap()
+			.begin_pass(&pass, vec![clear_color.into(), gaclen::graphics::vulkano::format::ClearValue::Depth(1.0)])
+				.draw(vec![triangle_buffer.clone()], push_constants)
+				.finish_pass()
 			.finish_frame();
 		
-		device = updated_device;
-
-		match after_frame {
-			Ok(future) => previous_frame_end = Some(future),
-			Err(graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate)) => {
-				recreate_swapchain = true;
-				previous_frame_end = None;
+		device = match after_frame {
+			Ok(device) => device,
+			Err((device, err)) => {
+				if err == graphics::device::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
+				device
 			},
-			Err(err) => {
-				println!("Error drawing: {:?}", err);
-				previous_frame_end = None;
-			}
 		};
 
-		frame_count = frame_count + 1;
+		frame_count += 1;
 
 		events_loop.poll_events(|event| {
 			match event {

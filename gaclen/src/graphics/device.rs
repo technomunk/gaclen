@@ -13,17 +13,22 @@
 use crate::window::Window;
 use super::context::Context;
 use super::ResizeError;
-use super::pass::GraphicalPass;
+use super::pass::{GraphicalPass, PresentPass};
 
 use std::sync::Arc;
 
 use vulkano::buffer::{CpuAccessibleBuffer};
-use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError};
+use vulkano::format::Format;
+use vulkano::image::{AttachmentImage, ImageCreationError};
+use vulkano::framebuffer::{Framebuffer, RenderPassAbstract};
+use vulkano::pipeline::viewport::Viewport;
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
 use vulkano::image::SwapchainImage;
 use vulkano::instance::PhysicalDevice;
 use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
+use vulkano::pipeline::GraphicsPipelineAbstract;
 
 pub use vulkano::swapchain::PresentMode;
 
@@ -41,18 +46,30 @@ pub struct Device {
 
 	pub(super) swapchain: Arc<Swapchain<Arc<Window>>>,
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
+	pub(super) swapchain_depths: Vec<Arc<AttachmentImage>>,
+	pub(super) swapchain_depth_format: Format,
+
+	pub(super) dynamic_state: DynamicState,
+
+	pub(super) last_frame: Option<Box<dyn GpuFuture>>,
 }
 
 /// A device that is in the middle of drawing a frame.
-pub struct DrawingDevice {
+pub struct Frame {
 	device: Device,
 	time: Box<dyn GpuFuture>,
 	commands: AutoCommandBufferBuilder,
 	image_index: usize,
 }
 
+/// A device that is in the middle of a draw-pass in a middle of drawing a frame.
+pub struct PassInFrame<'a, P : ?Sized, RP : ?Sized, PP> {
+	frame: Frame,
+	pass: &'a GraphicalPass<P, RP, PP>,
+}
+
 /// Error during device creation.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeviceCreationError {
 	/// No hardware devices were found.
 	NoPhysicalDevicesFound,
@@ -66,6 +83,8 @@ pub enum DeviceCreationError {
 	SurfaceCapabilities(vulkano::swapchain::CapabilitiesError),
 	/// Error during the creation of the swapchain.
 	Swapchain(SwapchainCreationError),
+	/// Error during the creation of the depth-buffer image.
+	Image(ImageCreationError),
 	/// No applicable format for draw-surface was found.
 	NoCompatibleFormatFound,
 	/// Window passed for the creation of the device has no apparent size..
@@ -73,7 +92,7 @@ pub enum DeviceCreationError {
 }
 
 /// Error finishing the frame.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FrameFinishError {
 	/// Error during flushing commands to the GPU.
 	Flush(FlushError),
@@ -82,7 +101,9 @@ pub enum FrameFinishError {
 }
 
 impl Device {
-	/// Create a new device that targets a specific window.
+	// TODO: add create() function with all parameters and use with_* for setting individual non-default parameters and new() with all default parameters.
+
+	/// Create a new device with default parameters.
 	pub fn new(context: &Context, window: Arc<Window>, present_mode: PresentMode) -> Result<Device, DeviceCreationError> {
 		let physical = select_physical_device(context)?;
 
@@ -91,21 +112,40 @@ impl Device {
 		let (logical, queues) = LogicalDevice::new(physical, physical.supported_features(), &device_extensions, queues.iter().cloned())?;
 		let [graphics_queue, transfer_queue, compute_queue] = unpack_queues(queues.collect());
 
-		let dimensions = match window.get_inner_size() {
-			Some(size) => size,
+		let dimensions: (u32, u32) = match window.get_inner_size() {
+			Some(size) => size.into(),
 			None => return Err(DeviceCreationError::UnsizedWindow),
 		};
 		let surface = vulkano_win::create_vk_surface(window, context.instance.clone())?;
-		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions.into(), &graphics_queue, present_mode)?;
+		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions, &graphics_queue, present_mode)?;
 
-		let device = Device {
+		let swapchain_depth_format = Format::D16Unorm;
+
+		let swapchain_depths = {
+			let image_count = swapchain_images.len();
+			let mut images = Vec::with_capacity(image_count);
+			for _ in 0..image_count {
+				images.push(AttachmentImage::transient(logical.clone(), [dimensions.0, dimensions.1], swapchain_depth_format)?);
+			};
+			images
+		};
+
+		let dynamic_state = DynamicState::default();
+
+		let mut device = Device {
 			device: logical,
 			graphics_queue,
 			transfer_queue,
 			compute_queue,
 			swapchain,
 			swapchain_images,
+			swapchain_depths,
+			swapchain_depth_format,
+			dynamic_state,
+			last_frame: None,
 		};
+
+		resize_dynamic_state_viewport(&mut device.dynamic_state, dimensions);
 
 		Ok(device)
 	}
@@ -117,30 +157,38 @@ impl Device {
 			None => return Err(ResizeError::UnsizedWindow),
 		};
 
+		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions);
+
+		// TODO: investigate weird UnsupportedDimensions swapchain error on some resizes
 		let (swapchain, images) = self.swapchain.recreate_with_dimension([dimensions.0, dimensions.1])?;
 		self.swapchain = swapchain;
 		self.swapchain_images = images;
+
+		self.swapchain_depths = {
+			let image_count = self.swapchain_images.len();
+			let mut images = Vec::with_capacity(image_count);
+			for _ in 0..image_count {
+				images.push(AttachmentImage::transient(self.device.clone(), [dimensions.0, dimensions.1], self.swapchain_depth_format)?);
+			};
+			images
+		};
+
 		Ok(())
 	}
 
-	/// Start drawing the frame.
+	/// Begin drawing the frame.
 	/// 
-	/// Takes ownership of the [Device](struct.Device.html) and converts it to a [DrawingDevice](struct.DrawingDevice.html).
+	/// Takes ownership of the [Device](struct.Device.html) and converts it to a [Frame](struct.Frame.html).
 	/// This corresponds to switching to the special 'middle of frame' state, that caches intermediate commands before submitting them to the GPU.
-	/// To exit the state and get back the ownership of the [Device](struct.Device.html) call [finish_frame method](struct.DrawingDevice.html#method.finish_frame.html).
+	/// In order to draw after beginning the frame, one needs to [begin a pass](struct.Frame.html#method.begin_pass).
 	#[inline]
-	pub fn start_frame(
-		self,
-		when: Option<Box<dyn GpuFuture>>,
-		final_pass: &impl GraphicalPass,
-		clear_value: Vec<vulkano::format::ClearValue>
-	) -> Result<DrawingDevice, (Self, vulkano::swapchain::AcquireError)> {
+	pub fn begin_frame(mut self) -> Result<Frame, (Self, vulkano::swapchain::AcquireError)> {
 		let (image_index, image_acquire_time) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
 			Ok(result) => result,
 			Err(err) => return Err((self, err)),
 		};
 
-		let time: Box<dyn GpuFuture> = match when {
+		let time: Box<dyn GpuFuture> = match self.last_frame.take() {
 			Some(mut time) => {
 				time.cleanup_finished();
 				Box::new(time.join(image_acquire_time))
@@ -148,18 +196,15 @@ impl Device {
 			None => Box::new(vulkano::sync::now(self.device.clone()).join(image_acquire_time)),
 		};
 
-		let commands = {
-			AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap()
-				.begin_render_pass(final_pass.framebuffers()[image_index].clone(), false, clear_value).unwrap()
-		};
+		let commands = AutoCommandBufferBuilder::primary_one_time_submit(self.device.clone(), self.graphics_queue.family()).unwrap();
 
-		let draw_device = DrawingDevice {
+		let frame = Frame {
 			device: self,
 			time,
 			commands,
-			image_index
+			image_index,
 		};
-		Ok(draw_device)
+		Ok(frame)
 	}
 
 	/// Create a basic buffer for data for processing on the GPU.
@@ -190,48 +235,89 @@ impl Device {
 	pub fn swapchain_images(&self) -> &Vec<Arc<SwapchainImage<Arc<Window>>>> { self.swapchain_images }
 }
 
-impl DrawingDevice {
-	/// Draw some data.
-	/// 
-	/// The exact result depends highly on the [GraphicalPass](traits.GraphicalPass.html) in question.
-	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
-	#[inline]
-	pub fn draw<PC>(
-		self,
-		pass: &impl GraphicalPass,
-		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
-		push_constants: PC
-	) -> Self {
-		let commands = self.commands.draw(pass.pipeline(), pass.dynamic_state(), vertex_buffer, (), push_constants).unwrap();
-		DrawingDevice { commands, .. self }
+impl Frame {
+	/// Begin a PresentPass (the results will be visible on the screen).
+	pub fn begin_pass<'a, P, RP>(
+		mut self,
+		pass: &'a GraphicalPass<P, RP, PresentPass>,
+		clear_values: Vec<vulkano::format::ClearValue>)
+	-> PassInFrame<'a, P, RP, PresentPass>
+	where
+		P : ?Sized,
+		RP : ?Sized + RenderPassAbstract + Send + Sync + 'static,
+	{
+		let framebuffer = Framebuffer::start(pass.render_pass.clone())
+			.add(self.device.swapchain_images[self.image_index].clone()).unwrap()
+			.add(self.device.swapchain_depths[self.image_index].clone()).unwrap()
+			.build().unwrap();
+		self.commands = self.commands.begin_render_pass(Arc::new(framebuffer), false, clear_values).unwrap();
+
+		PassInFrame {
+			frame: self,
+			pass: pass,
+		}
 	}
 
 	/// Finish drawing the frame and flush the commands to the GPU.
-	/// Note that it does not block execution until the frame is done, rather providing a GpuFuture for when the frame will have been drawn.
+	/// 
+	/// Releases the Device to allow starting a new frame, allocate new resources and anything else a [Device] is able to do.
 	#[inline]
-	pub fn finish_frame(self) -> (Device, Result<Box<dyn GpuFuture>, FrameFinishError>) {
-		let commands = self.commands.end_render_pass().unwrap().build().unwrap();
+	pub fn finish_frame(self) -> Result<Device, (Device, FrameFinishError)> {
+		let commands = self.commands.build().unwrap();
 		let after_execute = match self.time.then_execute(self.device.graphics_queue.clone(), commands) {
 			Ok(future) => future,
-			Err(err) => return (self.device, Err(FrameFinishError::Commands(err))),
+			Err(err) => return Err((self.device, FrameFinishError::Commands(err))),
 		};
 
 		let after_flush = after_execute.then_swapchain_present(self.device.graphics_queue.clone(), self.device.swapchain.clone(), self.image_index)
 			.then_signal_fence_and_flush();
 		
-		match after_flush {
-			Ok(future) => (self.device, Ok(Box::new(future))),
-			Err(err) => (self.device, Err(FrameFinishError::Flush(err))),
-		}
+		let after_frame = match after_flush {
+			Ok(future) => future,
+			Err(err) => return Err((self.device, FrameFinishError::Flush(err))),
+		};
+		let device = Device { last_frame: Some(Box::new(after_frame)), .. self.device };
+		Ok(device)
 	}
 }
 
+impl<'a, P, RP> PassInFrame<'a, P, RP, PresentPass>
+where
+	P : ?Sized + GraphicsPipelineAbstract + Send + Sync + 'static,
+	RP : ?Sized,
+{
+	/// Draw some data using a pass.
+	/// 
+	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
+	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
+	#[inline]
+	pub fn draw<PC>(
+		mut self,
+		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
+		push_constants: PC
+	) -> Self {
+		self.frame.commands = self.frame.commands.draw(self.pass.pipeline.clone(), &self.frame.device.dynamic_state, vertex_buffer, (), push_constants).unwrap();
+		self
+	}
+
+	/// Finish using a GraphicalPass.
+	/// 
+	/// Releases the consumed [Frame] to begin the next pass or finish the frame.
+	#[inline]
+	pub fn finish_pass(self) -> Frame {
+		let commands = self.frame.commands.end_render_pass().unwrap();
+		Frame { commands, .. self.frame }
+	}
+}
 
 impl From<vulkano::device::DeviceCreationError> for DeviceCreationError {
 	fn from(err: vulkano::device::DeviceCreationError) -> DeviceCreationError { DeviceCreationError::Logical(err) }
 }
 impl From<vulkano::swapchain::SurfaceCreationError> for DeviceCreationError {
 	fn from(err: vulkano::swapchain::SurfaceCreationError) -> DeviceCreationError { DeviceCreationError::Surface(err) }
+}
+impl From<ImageCreationError> for DeviceCreationError {
+	fn from(err: ImageCreationError) -> DeviceCreationError { DeviceCreationError::Image(err) }
 }
 
 impl std::fmt::Debug for Device {
@@ -299,7 +385,9 @@ fn create_swapchain(
 		alpha,
 		present_mode,
 		true,
-		None);
+		None
+	);
+	
 	match swapchain {
 		Ok(swapchain) => Ok(swapchain),
 		Err(err) => Err(DeviceCreationError::Swapchain(err)),
@@ -361,6 +449,24 @@ fn unpack_queues(mut queues: Vec<Arc<DeviceQueue>>) -> [Arc<DeviceQueue>; 3] {
 		},
 		_ => panic!("Unexpected number of queues created, something wend wrong during device initialization.")
 	}
+}
+
+fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (u32, u32)) {
+	let viewport = Viewport {
+		origin: [ 0.0, dimensions.1 as f32],
+		dimensions: [dimensions.0 as f32, -(dimensions.1 as f32)],
+		depth_range: 1.0 .. 0.0,
+	};
+	
+	match dynamic_state.viewports {
+		Some(ref mut vec) => {
+			match vec.len() {
+				0 => vec.push(viewport),
+				_ => vec[0] = viewport,
+			}
+		},
+		None => dynamic_state.viewports = Some(vec![viewport]),
+	};
 }
 
 fn validate_physical_device<'a>(device: &PhysicalDevice<'a>) -> bool {

@@ -1,8 +1,26 @@
 # Changelog
 
+## 0.0.6 Building Passes in Frames
+
+- **!BREAKING CHANGE!** refactors Drawing device into 2 sub-states:
+  - *Frame* - active frame
+  - *PassInFrame* - an active graphical pass within a frame
+- **!BREAKING CHANGE!** refactor GraphicalPass to be struct and not a trait
+- change the example to handle failing resizing device by skipping a frame
+- change the example to work with breaking changes
+- update *'vulkano'* dependency to 0.16.0
+- move re-exports to sub-projects
+  - vulkano is now exported by gaclen::graphics
+  - winit is now exported by gaclen::window
+  - gaclen::window also directly exports winit items
+- create a split gaclen_shader project that re-exports a tweaked version of vulkano_shader! macro
+  - this drops the necessity of depending on vulkano
+  - vulkano can be used from gaclen::graphics::vulkano
+- create GraphicalPassBuilder for initializing a GraphicalPass
+
 ## 0.0.5 PresentMode
 
-- **BREAKING CHANGE!** allows different present modes for device swapchain
+- **!BREAKING CHANGE!** allows different present modes for device swapchain
 - re-exports vulkano-shader of compatible version with used vulkano
 
 ## 0.0.4 First 'Feature'

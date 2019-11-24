@@ -1,28 +1,6 @@
-[package]
-name = "gaclen"
-version = "0.0.5"
-authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
-edition = "2018"
-
-description = "A library for handling anything a game client needs to do."
-readme = "readme.md"
-keywords = ["gamedev", "graphics", "rendering", "vulkan", "gpu"]
-categories = ["rendering::engine", "game-engines", "graphics"]
-license = "Apache-2.0 OR MIT"
-
-repository = "https://github.com/Griffone/gaclen"
-documentation = "https://docs.rs/gaclen"
-
-[features]
-default = []
-# Expose underlying vulkano members to allow extending gaclen functionality
-expose-underlying-vulkano = []
-
-[dependencies]
-winit = "0.19.0" # window handling
-vulkano = "0.14.0" # vulkan library in Rust
-vulkano-win = "0.14.0" # vulkan-winit linkage
-vulkano-shaders = "0.14.0" # inline shader library
-
-[dev-dependencies]
-cgmath = "0.17.0" # linear algebra library
+[workspace]
+members = [
+	"gaclen",
+	"gaclen_shader",
+]
+default-members = ["gaclen"]

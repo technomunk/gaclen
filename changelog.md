@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.6 (pending)
+## 0.0.6 Building Passes in Frames
 
 - **!BREAKING CHANGE!** refactors Drawing device into 2 sub-states:
   - *Frame* - active frame
@@ -14,6 +14,8 @@
 - create a split gaclen_shader project that re-exports a tweaked version of vulkano_shader! macro
   - this drops the necessity of depending on vulkano
   - vulkano can be used from gaclen::graphics::vulkano
+- refactor GraphicalPass to be struct and not a trait
+- create GraphicalPassBuilder for initializing a GraphicalPass
 
 ## 0.0.5 PresentMode
 

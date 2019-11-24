@@ -1,6 +1,7 @@
 use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineAbstract, GraphicsPipelineCreationError};
+use vulkano::pipeline::depth_stencil::{Compare, DepthStencil};
 use vulkano::pipeline::shader::{SpecializationConstants, GraphicsEntryPointAbstract};
-use vulkano::pipeline::raster::{CullMode, DepthBiasControl, FrontFace, PolygonMode, Rasterization};
+use vulkano::pipeline::raster::{CullMode, FrontFace, PolygonMode, Rasterization};
 use vulkano::pipeline::vertex::{SingleBufferDefinition, VertexDefinition};
 use vulkano::framebuffer::{RenderPassAbstract, RenderPassCreationError, Subpass};
 
@@ -13,13 +14,14 @@ use std::sync::Arc;
 
 pub use vulkano::pipeline::input_assembly::PrimitiveTopology;
 
-/// A structure for initializing [GraphicalPasses](struct.GraphicalPass)
+/// A structure for initializing [GraphicalPasses](struct.GraphicalPass).
 pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	vertex_input: VI,
 	vertex_shader: (VS, VSS),
 	primitive_topology: PrimitiveTopology,
 	rasterization: Rasterization,
 	fragment_shader: (FS, FSS),
+	depth_stencil: DepthStencil,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,6 +38,7 @@ impl GraphicalPassBuilder<(), (), (), (), ()> {
 			primitive_topology: PrimitiveTopology::TriangleList,
 			rasterization: Rasterization::default(),
 			fragment_shader: ((), ()),
+			depth_stencil: DepthStencil::default(),
 		}
 	}
 }
@@ -49,6 +52,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 			primitive_topology: self.primitive_topology,
 			rasterization: self.rasterization,
 			fragment_shader: self.fragment_shader,
+			depth_stencil: self.depth_stencil,
 		}
 	}
 
@@ -59,39 +63,28 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// 
 	/// Default is [PrimitiveTopology::TriangleList].
 	pub fn primitive_topology(self, topology: PrimitiveTopology) -> Self { Self { primitive_topology: topology, .. self } }
-
 	/// Use [PrimitiveTopology::PointList]. 
 	pub fn point_list(self) -> Self { self.primitive_topology(PrimitiveTopology::PointList) }
-
 	/// Use [PrimitiveTopology::LineList].
 	pub fn line_list(self) -> Self { self.primitive_topology(PrimitiveTopology::LineList) }
-	
 	/// Use [PrimitiveTopology::LineStrip].
 	pub fn line_strip(self) -> Self { self.primitive_topology(PrimitiveTopology::LineStrip) }
-	
 	/// Use [PrimitiveTopology::TriangleList].
 	/// 
 	/// This is the default.
 	pub fn triangle_list(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleList) }
-	
 	/// Use [PrimitiveTopology::TriangleStrip].
 	pub fn triangle_strip(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleStrip) }
-
 	/// Use [PrimitiveTopology::TriangleFan].
 	pub fn triangle_fan(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleFan) }
-
 	/// Use [PrimitiveTopology::LineListWithAdjacency].
 	pub fn line_list_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::LineListWithAdjacency) }	
-
 	/// Use [PrimitiveTopology::LineStripWithAdjacency].
 	pub fn line_strip_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::LineStripWithAdjacency) }
-
 	/// Use [PrimitiveTopology::TriangleListWithAdjacency].
 	pub fn triangle_list_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleListWithAdjacency) }
-
 	/// Use [PrimitiveTopology::TriangleStripWithAdjacency].
 	pub fn triangle_strip_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleStripWithAdjacency) }
-
 	/// Use [PrimitiveTopology::PatchList].
 	pub fn patch_list(self, vertices_per_patch: u32) -> Self { self.primitive_topology(PrimitiveTopology::PatchList{ vertices_per_patch }) }
 
@@ -108,16 +101,12 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// 
 	/// Default is [CullMode::None].
 	pub fn cull_mode(mut self, mode: CullMode) -> Self { self.rasterization.cull_mode = mode; self }
-
 	/// Don't cull (default).
 	pub fn cull_none(self) -> Self { self.cull_mode(CullMode::None) }
-
 	/// Cull front faces.
 	pub fn cull_front(self) -> Self { self.cull_mode(CullMode::Front) }
-
 	/// Cull back faces.
 	pub fn cull_back(self) -> Self { self.cull_mode(CullMode::Back) }
-
 	/// Cull both back and front faces.
 	pub fn cull_front_and_back(self) -> Self { self.cull_mode(CullMode::FrontAndBack) }
 
@@ -125,10 +114,8 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// 
 	/// Default is [FrontFace::CounterClockwise].
 	pub fn front_face(mut self, face: FrontFace) -> Self { self.rasterization.front_face = face; self }
-
 	/// Set clockwise faces as front.
 	pub fn front_face_clockwise(self) -> Self { self.front_face(FrontFace::Clockwise) }
-
 	/// Set counter-clockwise faces as front.
 	/// 
 	/// This is the default.
@@ -140,6 +127,32 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	// TODO: support this
 	// /// Set the width of the lines drawn as dynamic, requiring their specification during draw call.
 	// pub fn line_width_dynamic(mut self) -> Self { self.rasterization.line_width = None; self }
+
+	/// Set whether to write to the depth buffer.
+	/// 
+	/// Default is `false`.
+	pub fn depth_write(mut self, write: bool) -> Self { self.depth_stencil.depth_write = write; self }
+
+	/// Set the operation to use for the depth test.
+	/// 
+	/// Default is `???`.
+	pub fn depth_test_op(mut self, operation: Compare) -> Self { self.depth_stencil.depth_compare = operation; self }
+	/// Set the depth test to always fail.
+	pub fn depth_test_never(self) -> Self { self.depth_test_op(Compare::Never) }
+	/// Set the depth test to pass if `value < reference_value`.
+	pub fn depth_test_less(self) -> Self { self.depth_test_op(Compare::Less) }
+	/// Set the depth test to pass if `value == reference_value`.
+	pub fn depth_test_equal(self) -> Self { self.depth_test_op(Compare::Equal) }
+	/// Set the depth test to pass if `value <= reference_value`.
+	pub fn depth_test_less_or_equal(self) -> Self  { self.depth_test_op(Compare::LessOrEqual) }
+	/// Set the depth test to pass if `value > reference_value`.
+	pub fn depth_test_greater(self) -> Self { self.depth_test_op(Compare::Greater) }
+	/// Set the depth test to pass if `value != reference_value`.	
+	pub fn depth_test_not_equal(self) -> Self { self.depth_test_op(Compare::NotEqual) }
+	/// Set the depth test to pass if `value >= reference_value`.	
+	pub fn depth_test_greater_or_equal(self) -> Self { self.depth_test_op(Compare::GreaterOrEqual) }
+	/// Set the depth test to always pass. (default?)
+	pub fn depth_test_always(self) -> Self { self.depth_test_op(Compare::Always) }
 
 	/// Use given vertex shader with given specialization constants.
 	pub fn vertex_shader<S, SC>(self, shader: S, specialization: SC)
@@ -154,6 +167,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 			primitive_topology: self.primitive_topology,
 			rasterization: self.rasterization,
 			fragment_shader: self.fragment_shader,
+			depth_stencil: self.depth_stencil,
 		}
 	}
 
@@ -170,6 +184,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 			primitive_topology: self.primitive_topology,
 			rasterization: self.rasterization,
 			fragment_shader: (shader, specialization),
+			depth_stencil: self.depth_stencil,
 		}
 	}
 }
@@ -186,7 +201,7 @@ where
 {
 	// TODO: Figure out if these can be switched to static dispatch (impl instead of dyn)
 	pub fn build_present_pass(self, device: &Device)
-	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync, dyn RenderPassAbstract + Send + Sync, (), PresentPass>, BuildError> {
+	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync, dyn RenderPassAbstract + Send + Sync, PresentPass>, BuildError> {
 		let render_pass = Arc::new(vulkano::single_pass_renderpass!(
 			device.device.clone(),
 			attachments: {
@@ -215,7 +230,7 @@ where
 			.primitive_topology(self.primitive_topology)
 			.viewports_dynamic_scissors_irrelevant(1)
 			.fragment_shader(self.fragment_shader.0, self.fragment_shader.1)
-			.depth_stencil_simple_depth()
+			.depth_stencil(self.depth_stencil)
 			.render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
 			.depth_clamp(self.rasterization.depth_clamp)
 			;
@@ -246,7 +261,7 @@ where
 			Arc::new(builder.build(device.device.clone())?)
 		};
 		
-		Ok(GraphicalPass { render_pass, pipeline, images: (), phantom: std::marker::PhantomData })
+		Ok(GraphicalPass { render_pass, pipeline, phantom: std::marker::PhantomData })
 	}
 }
 

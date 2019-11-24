@@ -1,7 +1,7 @@
 //! ***Ga**me* ***Cl**ient* ***En**gine* provides functionality specific to game clients such as:
-//! - Rendering using hardware acceleration (uses [vulkano](https://vulkano.rs/))
-//! - Handling OS integration, populating window context and processing input (uses [winit](https://docs.rs/winit/))
-//! - Processing and playing audio (planned)
+//! - Rendering using hardware acceleration (uses [vulkano](https://vulkano.rs/)).
+//! - Handling OS integration, populating window context and processing input (uses [winit](https://docs.rs/winit/)).
+//! - Processing and playing audio (planned).
 //! 
 //! The library intentionally does **not** support the following:
 //! - **Networking**, as it should be shared between game clients and servers.

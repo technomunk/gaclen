@@ -48,6 +48,7 @@ pub struct Device {
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
 	pub(super) swapchain_depths: Vec<Arc<AttachmentImage>>,
 	pub(super) swapchain_depth_format: Format,
+	pub(super) inverse_depth: bool,
 
 	pub(super) dynamic_state: DynamicState,
 
@@ -141,13 +142,28 @@ impl Device {
 			swapchain_images,
 			swapchain_depths,
 			swapchain_depth_format,
+			inverse_depth: false,
 			dynamic_state,
 			last_frame: None,
 		};
 
-		resize_dynamic_state_viewport(&mut device.dynamic_state, dimensions);
+		resize_dynamic_state_viewport(&mut device.dynamic_state, dimensions, false);
 
 		Ok(device)
+	}
+
+	/// Set the depth buffer to use forward (inverse == false) or inverse range.
+	/// 
+	/// Forward range is 0.0 being the front and the 1.0 being the away.
+	/// Inverse range is 1.0 the front and 0.0 being the away.
+	/// The advantages of different approaches are to be researched by the reader.
+	pub fn inverse_depth(&mut self, inverse: bool) {
+		self.inverse_depth = inverse;
+		let dimensions = {
+			let dimensions = self.swapchain_depths[0].dimensions();
+			(dimensions[0], dimensions[1])
+		};
+		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, inverse);
 	}
 
 	/// Update the device for the resized window.
@@ -157,7 +173,7 @@ impl Device {
 			None => return Err(ResizeError::UnsizedWindow),
 		};
 
-		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions);
+		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, self.inverse_depth);
 
 		// TODO: investigate weird UnsupportedDimensions swapchain error on some resizes
 		let (swapchain, images) = self.swapchain.recreate_with_dimension([dimensions.0, dimensions.1])?;
@@ -451,11 +467,11 @@ fn unpack_queues(mut queues: Vec<Arc<DeviceQueue>>) -> [Arc<DeviceQueue>; 3] {
 	}
 }
 
-fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (u32, u32)) {
+fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (u32, u32), inverse: bool) {
 	let viewport = Viewport {
 		origin: [ 0.0, dimensions.1 as f32],
 		dimensions: [dimensions.0 as f32, -(dimensions.1 as f32)],
-		depth_range: 1.0 .. 0.0,
+		depth_range: if inverse { 1.0 .. 0.0 } else { 0.0 .. 1.0 },
 	};
 	
 	match dynamic_state.viewports {

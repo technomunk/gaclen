@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.7 Textured Cube
+
+- **!IMPORTANT!** removes implicit viewport transformation, this results in:
+  - flipped y-screenspace direction
+  - default depth now works as expected
+- **!BREAKING CHANGE!** device.draw() now requires a descriptor_set
+- adds basic_ and inverse_ depth tests to GraphicalPassBuilder
+- introduce descriptor_sets
+
 ## 0.0.6 Building Passes in Frames
 
 - **!BREAKING CHANGE!** refactors Drawing device into 2 sub-states:

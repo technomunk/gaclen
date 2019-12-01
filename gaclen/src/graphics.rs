@@ -12,6 +12,8 @@ pub mod pass;
 pub use vulkano;
 pub use vulkano::impl_vertex;
 pub use vulkano::instance::Version;
+pub use vulkano::buffer::BufferUsage;
+pub use vulkano::descriptor::*;
 
 const REQUIRED_VULKAN_VERSION: Version = Version { major: 1, minor: 0, patch: 0 };
 const ENGINE_NAME: &str = "gaclen";

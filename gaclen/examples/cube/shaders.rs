@@ -5,7 +5,7 @@ pub mod vertex {
 	}
 
 	// force recompilation on changes in shader source
-	const bytes: &'static [u8] = include_bytes!("shader.vert");
+	const _: &'static [u8] = include_bytes!("shader.vert");
 }
 pub mod fragment {
 	gaclen_shader::shader!{
@@ -14,5 +14,5 @@ pub mod fragment {
 	}
 
 	// force recompilation on changes in shader source
-	const bytes: &'static [u8] = include_bytes!("shader.frag");
+	const _: &'static [u8] = include_bytes!("shader.frag");
 }

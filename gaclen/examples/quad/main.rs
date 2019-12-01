@@ -83,7 +83,7 @@ fn main() {
 
 		let after_frame = device.begin_frame().unwrap()
 			.begin_pass(&pass, vec![clear_color.into(), gaclen::graphics::vulkano::format::ClearValue::Depth(1.0)])
-				.draw(vec![triangle_buffer.clone()], push_constants)
+				.draw(vec![triangle_buffer.clone()], (), push_constants)
 				.finish_pass()
 			.finish_frame();
 		

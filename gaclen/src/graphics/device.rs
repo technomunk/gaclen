@@ -17,18 +17,18 @@ use super::pass::{GraphicalPass, PresentPass};
 
 use std::sync::Arc;
 
-use vulkano::buffer::{CpuAccessibleBuffer};
-use vulkano::format::Format;
-use vulkano::image::{AttachmentImage, ImageCreationError};
-use vulkano::framebuffer::{Framebuffer, RenderPassAbstract};
-use vulkano::pipeline::viewport::Viewport;
+use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer, CpuBufferPool};
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
+use vulkano::descriptor::descriptor_set::DescriptorSetsCollection;
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
-use vulkano::image::SwapchainImage;
+use vulkano::format::Format;
+use vulkano::framebuffer::{Framebuffer, RenderPassAbstract};
+use vulkano::image::{AttachmentImage, ImageCreationError, SwapchainImage};
+use vulkano::pipeline::viewport::Viewport;
+use vulkano::pipeline::GraphicsPipelineAbstract;
 use vulkano::instance::PhysicalDevice;
 use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
-use vulkano::pipeline::GraphicsPipelineAbstract;
 
 pub use vulkano::swapchain::PresentMode;
 
@@ -225,7 +225,14 @@ impl Device {
 
 	/// Create a basic buffer for data for processing on the GPU.
 	pub fn create_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, vulkano::memory::DeviceMemoryAllocError> {
-		CpuAccessibleBuffer::from_iter(self.device.clone(), vulkano::buffer::BufferUsage::all(), data_iterator)
+		CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), data_iterator)
+	}
+
+	/// Create a pool of small CPU-accessible buffers.
+	/// 
+	/// These are particularly useful for regularly changing data, such as object uniforms.
+	pub fn create_cpu_buffer_pool<T: 'static>(&self, usage: BufferUsage) -> CpuBufferPool<T> {
+		CpuBufferPool::<T>::new(self.device.clone(), usage)
 	}
 
 	/// Get the underlying logical device (useful for supplying to own shaders).
@@ -307,12 +314,15 @@ where
 	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
 	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
 	#[inline]
-	pub fn draw<PC>(
+	pub fn draw<DSC, PC>(
 		mut self,
 		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
+		descriptor_sets: DSC,
 		push_constants: PC
-	) -> Self {
-		self.frame.commands = self.frame.commands.draw(self.pass.pipeline.clone(), &self.frame.device.dynamic_state, vertex_buffer, (), push_constants).unwrap();
+	) -> Self
+	where DSC: DescriptorSetsCollection
+	{
+		self.frame.commands = self.frame.commands.draw(self.pass.pipeline.clone(), &self.frame.device.dynamic_state, vertex_buffer, descriptor_sets, push_constants).unwrap();
 		self
 	}
 

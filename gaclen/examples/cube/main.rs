@@ -1,3 +1,10 @@
+//! A lit, textured Cube example.
+//! 
+//! This example showcases all functionality required to render a believable 3D world.
+//! It is limited to a single cube, a real scene would be a lot more complex, likely with additional helper code and resources.
+//! 
+//! Please note, that because of screen-space coordinate mismatch between OpenGL and Vulkan the `up` coordinate and triangle-faces are reversed.
+
 extern crate gaclen;
 
 mod shaders;
@@ -11,13 +18,6 @@ use gaclen::window::{
 	Event, WindowEvent,
 };
 
-#[derive(Default, Debug, Clone)]
-struct Vertex {
-	position: [f32; 3],
-	color: [f32; 4],
-}
-vulkano::impl_vertex!(Vertex, position, color);
-
 fn main() {
 	let mut frame_count: u64 = 0;
 	let start_time = std::time::Instant::now();
@@ -25,7 +25,7 @@ fn main() {
 	let mut events_loop = EventsLoop::new();
 	let window = std::sync::Arc::new(
 		WindowBuilder::new()
-			.with_title("Shadowing example")
+			.with_title("Cube example")
 			.with_dimensions((1280, 720).into())
 			.with_min_dimensions((1280, 720).into())
 			.build(&events_loop).unwrap()
@@ -36,18 +36,20 @@ fn main() {
 	println!("Initialized device: {:?}", device);
 
 	let albedo_pass = {
-		let vs = shaders::albedo::vertex::Shader::load(&device).unwrap();
-		let fs = shaders::albedo::fragment::Shader::load(&device).unwrap();
+		let vs = shaders::vertex::Shader::load(&device).unwrap();
+		let fs = shaders::fragment::Shader::load(&device).unwrap();
 
 		graphics::pass::GraphicalPass::start()
-			.single_buffer_input::<Vertex>()
+			.single_buffer_input::<geometry::Vertex>()
 			.vertex_shader(vs.main_entry_point(), ())
 			.fragment_shader(fs.main_entry_point(), ())
+			.basic_depth_test()
+			.front_face_clockwise()
+			.cull_back()
 			.build_present_pass(&device).unwrap()
 	};
 
-	let quad = geometry::generate_quad(&device);
-	let cube = geometry::generate_quad(&device);
+	let geometry = geometry::generate_cube(&device).unwrap();
 
 	let mut recreate_swapchain = false;
 
@@ -67,18 +69,18 @@ fn main() {
 		}
 
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
+		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f32(), window.get_inner_size().unwrap().into());
 
 		let after_frame = device.begin_frame().unwrap()
 			.begin_pass(&albedo_pass, vec![clear_color.into(), 1f32.into()])
-				.draw(vec![quad.clone()], ())
-				.draw(vec![cube.clone()], ())
+				.draw(vec![geometry.clone()], push_constants)
 				.finish_pass()
 			.finish_frame();
 		
 		device = match after_frame {
 			Ok(device) => device,
 			Err((device, err)) => {
-				if err == graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
+				if err == graphics::device::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
 				device
 			},
 		};
@@ -98,4 +100,23 @@ fn main() {
 	let fps: f64 = frame_count as f64 / run_duration;
 
 	println!("Produced {} frames over {:.2} seconds ({:.2} avg fps)", frame_count, run_duration, fps);
+}
+
+fn push_constants_from_time(time: f32, window_resolution: (u32, u32)) -> shaders::vertex::ty::PushConstantData {
+	let time = time / 10.0 * std::f32::consts::PI;
+
+	let model: cgmath::Matrix4<f32> = cgmath::Euler { x: cgmath::Rad(0.0), y: cgmath::Rad(0.0), z: cgmath::Rad(time) }.into();
+
+	let view = cgmath::Matrix4::look_at(
+		cgmath::Point3 { x: 3.0, y: 0.0, z: 2.0 },
+		cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+		cgmath::Vector3 { x: 0.0, y: 0.0, z: -1.0 });
+	
+	let aspect = window_resolution.0 as f32 / window_resolution.1 as f32;
+	
+	let proj: cgmath::Matrix4<f32> = cgmath::PerspectiveFov { fovy: cgmath::Deg(40.0).into(), aspect, near: 0.1, far: 5.0 }.into();
+
+	let mvp = proj * view * model;
+
+	shaders::vertex::ty::PushConstantData { MVP: mvp.into() }
 }

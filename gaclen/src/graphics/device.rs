@@ -469,8 +469,8 @@ fn unpack_queues(mut queues: Vec<Arc<DeviceQueue>>) -> [Arc<DeviceQueue>; 3] {
 
 fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (u32, u32), inverse: bool) {
 	let viewport = Viewport {
-		origin: [ 0.0, dimensions.1 as f32],
-		dimensions: [dimensions.0 as f32, -(dimensions.1 as f32)],
+		origin: [0.0, 0.0],
+		dimensions: [dimensions.0 as f32, dimensions.1 as f32],
 		depth_range: if inverse { 1.0 .. 0.0 } else { 0.0 .. 1.0 },
 	};
 	

@@ -1,3 +1,9 @@
+//! Most basic gaclen usage example.
+//! 
+//! Draws a single quad without depth or culling.
+//! 
+//! Please note, that because of screen-space coordinate mismatch between OpenGL and Vulkan the `up` coordinate is reversed.
+
 extern crate gaclen;
 
 mod shaders;
@@ -115,11 +121,11 @@ fn push_constants_from_time(time: f32, window_resolution: (u32, u32)) -> shaders
 	let view = cgmath::Matrix4::look_at(
 		cgmath::Point3 { x, y, z: 1.0 },
 		cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 },
-		cgmath::Vector3 { x: 0.0, y: 0.0, z: 1.0 });
+		cgmath::Vector3 { x: 0.0, y: 0.0, z: -1.0 });
 	
 	let aspect = window_resolution.0 as f32 / window_resolution.1 as f32;
 	
-	let proj: cgmath::Matrix4<f32> = cgmath::PerspectiveFov { fovy: cgmath::Deg(60.0).into(), aspect, near: std::f32::EPSILON, far: 4.0 }.into();
+	let proj: cgmath::Matrix4<f32> = cgmath::PerspectiveFov { fovy: cgmath::Deg(60.0).into(), aspect, near: 0.1, far: 4.0 }.into();
 
 	let mvp = proj * view;
 

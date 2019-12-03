@@ -61,6 +61,5 @@ pub fn generate_cube(device: &GaclenDevice) -> Result<Arc<CpuAccessibleBuffer<[V
 		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 1.0, 1.0 ] },
 		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 0.0, 0.0 ] },
 		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 1.0, 0.0 ] },
-		
 	].iter().cloned())
 }

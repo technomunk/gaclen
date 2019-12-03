@@ -1,7 +1,7 @@
 pub mod vertex {
 	gaclen_shader::shader!{
 		ty: "vertex",
-		path: "examples/cube/shader.vert",
+		path: "examples/phong_cube/shader.vert",
 	}
 
 	// force recompilation on changes in shader source
@@ -10,7 +10,7 @@ pub mod vertex {
 pub mod fragment {
 	gaclen_shader::shader!{
 		ty: "fragment",
-		path: "examples/cube/shader.frag",
+		path: "examples/phong_cube/shader.frag",
 	}
 
 	// force recompilation on changes in shader source

@@ -1,4 +1,4 @@
-//! A lit, textured Cube example.
+//! A phong-lit, textured Cube example.
 //! 
 //! This example showcases all functionality required to render a believable 3D world.
 //! It is limited to a single cube, a real scene would be a lot more complex, likely with additional helper code and resources.
@@ -17,6 +17,8 @@ use gaclen::window::{
 	EventsLoop,
 	Event, WindowEvent,
 };
+
+use cgmath::Rotation3;
 
 use std::sync::Arc;
 
@@ -56,7 +58,26 @@ fn main() {
 	let transform_buffer_pool = device.create_cpu_buffer_pool::<shaders::vertex::ty::TransformData>(graphics::BufferUsage::all());
 	let light_buffer_pool = device.create_cpu_buffer_pool::<shaders::fragment::ty::LightData>(graphics::BufferUsage::all());
 	
+	let light = {
+		let data = shaders::fragment::ty::LightData {
+			position: [2.0, -2.0, 1.0, 0.0],
+			ambient: [0.1; 4],
+			diffuse: [0.8; 4],
+			specular: [1.0; 4], // 4th component is power
+		};
+		light_buffer_pool.next(data).unwrap()
+	};
+
+	let light_descriptor_set = Arc::new(albedo_pass.start_persistent_descriptor_set(1)
+		.add_buffer(light).unwrap()
+		.build().unwrap());
+
 	let mut recreate_swapchain = false;
+
+	let mut rotation_enabled = false;
+	let mut last_x = 0;
+	let mut last_y = 0;
+	let mut object_rotation = cgmath::Quaternion::new(1.0, 0.0, 0.0, 0.0);
 
 	let mut running = true;
 	while running {
@@ -76,28 +97,17 @@ fn main() {
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 
 		let transform = {
-			let data = transform_from_time(start_time.elapsed().as_secs_f32(), window.get_inner_size().unwrap().into());
+			let data = transform(object_rotation.clone(), window.get_inner_size().unwrap().into());
 			transform_buffer_pool.next(data).unwrap()
 		};
-		let light = {
-			let data = shaders::fragment::ty::LightData {
-				position: [2.0, -1.0, 2.0],
-				_dummy0: [0; 4],
-				direct: [1.0; 3],
-				_dummy1: [0; 4],
-				ambient: [0.1, 0.0, 0.0],
-			};
-			light_buffer_pool.next(data).unwrap()
-		};
 
-		let descriptor_set = Arc::new(albedo_pass.start_persistent_descriptor_set(0)
+		let transform_descriptor_set = Arc::new(albedo_pass.start_persistent_descriptor_set(0)
 			.add_buffer(transform).unwrap()
-			.add_buffer(light).unwrap()
 			.build().unwrap());
 
 		let after_frame = device.begin_frame().unwrap()
 			.begin_pass(&albedo_pass, vec![clear_color.into(), 1f32.into()])
-				.draw(vec![geometry.clone()], descriptor_set, ())
+				.draw(vec![geometry.clone()], (transform_descriptor_set, light_descriptor_set.clone()), ())
 				.finish_pass()
 			.finish_frame();
 		
@@ -115,6 +125,24 @@ fn main() {
 			match event {
 				Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => running = false,
 				Event::WindowEvent { event: WindowEvent::Resized(_), .. } => recreate_swapchain = true,
+				Event::WindowEvent { event: WindowEvent::MouseInput{state, button, .. }, .. } => {
+					rotation_enabled = (button == gaclen::window::MouseButton::Right) && state == gaclen::window::ElementState::Pressed;
+
+				}
+				Event::WindowEvent { event: WindowEvent::CursorMoved{ position, .. }, .. } => {
+					let (x, y) = position.into();
+					
+					if rotation_enabled {
+						let (width, height) : (f64, f64) = window.get_inner_size().unwrap().into();
+						let delta_x = (x as f32 - last_x as f32) / width as f32;
+						let delta_y = (y as f32 - last_y as f32) / height as f32;
+						let delta : cgmath::Quaternion<_> = cgmath::Euler::new(cgmath::Rad(0.0), cgmath::Rad(delta_y), -cgmath::Rad(delta_x)).into();
+						object_rotation = delta * object_rotation;
+					}
+
+					last_x = x;
+					last_y = y;
+				}
 				_ => ()
 			}
 		});
@@ -126,18 +154,17 @@ fn main() {
 	println!("Produced {} frames over {:.2} seconds ({:.2} avg fps)", frame_count, run_duration, fps);
 }
 
-fn transform_from_time(time: f32, window_resolution: (u32, u32)) -> shaders::vertex::ty::TransformData {
-	let rotation = time / 10.0 * std::f32::consts::PI;
-
+// Ideally the view and projection matrices would be found by some 'Camera' concept.
+fn transform(rotation: cgmath::Quaternion<f32>, window_resolution: (u32, u32)) -> shaders::vertex::ty::TransformData {
 	let aspect = window_resolution.0 as f32 / window_resolution.1 as f32;
 
-	let model: cgmath::Matrix4<f32> = cgmath::Euler{ x: cgmath::Rad(0.0), y: cgmath::Rad(0.0), z: cgmath::Rad(rotation) }.into();
-	let proj: cgmath::Matrix4<f32> = cgmath::PerspectiveFov { fovy: cgmath::Deg(40.0).into(), aspect, near: 0.1, far: 5.0 }.into();
+	let model: cgmath::Matrix4<f32> = rotation.into();
+	let proj: cgmath::Matrix4<f32> = cgmath::PerspectiveFov { fovy: cgmath::Deg(40.0).into(), aspect, near: 0.1, far: 4.0 }.into();
 
 	shaders::vertex::ty::TransformData {
 		model: model.into(),
 		view: cgmath::Matrix4::look_at(
-			cgmath::Point3 { x: 3.0, y: 0.0, z: 2.0 },
+			cgmath::Point3 { x: 3.0, y: 0.0, z: 0.0 },
 			cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 },
 			cgmath::Vector3 { x: 0.0, y: 0.0, z: -1.0 }).into(),
 		proj: proj.into(),

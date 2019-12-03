@@ -7,7 +7,8 @@
   - default depth now works as expected
 - **!BREAKING CHANGE!** device.draw() now requires a descriptor_set
 - adds basic_ and inverse_ depth tests to GraphicalPassBuilder
-- introduce descriptor_sets
+- introduces descriptor_sets
+- adds phong_cube example
 
 ## 0.0.6 Building Passes in Frames
 

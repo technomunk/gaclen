@@ -62,7 +62,7 @@ fn main() {
 		let data = shaders::fragment::ty::LightData {
 			position: [2.0, -2.0, 1.0, 0.0],
 			ambient: [0.1; 4],
-			diffuse: [0.8; 4],
+			diffuse: [0.8, 0.8, 0.8, 2.0],
 			specular: [1.0; 4], // 4th component is power
 		};
 		light_buffer_pool.next(data).unwrap()

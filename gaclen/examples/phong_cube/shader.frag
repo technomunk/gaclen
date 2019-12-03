@@ -14,6 +14,20 @@ layout(set = 1, binding = 0) uniform LightData {
 layout(location = 0) out vec4 out_color;
 
 void main() {
-	vec3 color = u_light.ambient.xyz + u_light.diffuse.xyz * clamp(dot(normalize(u_light.position.xyz - in_position), in_normal), 0, 1);
+	vec3 light_dir = u_light.position.xyz - in_position;
+	float light_dist = length(light_dir);
+	light_dist = light_dist * light_dist;
+	light_dir = normalize(light_dir);
+	vec3 normal = normalize(in_normal);
+
+	float lambertian = max(dot(light_dir, normal), 0.0);
+	float specular = 0.0;
+
+	// TODO: specularity
+
+	vec3 color =
+		u_light.ambient.xyz +
+		u_light.diffuse.xyz * lambertian * u_light.diffuse.w / light_dist +
+		u_light.specular.xyz * specular / light_dist;
 	out_color = vec4(color, 1);
 }

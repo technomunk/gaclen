@@ -6,3 +6,4 @@ Cargo.lock
 # Ignore user defined settings
 # Ask @Griffone for his, if you wish
 /.vscode
+/.cargo

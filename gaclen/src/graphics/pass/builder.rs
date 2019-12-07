@@ -135,7 +135,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 
 	/// Set the operation to use for the depth test.
 	/// 
-	/// Default is `???`.
+	/// Default is `always`.
 	pub fn depth_test_op(mut self, operation: Compare) -> Self { self.depth_stencil.depth_compare = operation; self }
 	/// Set the depth test to always fail.
 	pub fn depth_test_never(self) -> Self { self.depth_test_op(Compare::Never) }
@@ -151,8 +151,18 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	pub fn depth_test_not_equal(self) -> Self { self.depth_test_op(Compare::NotEqual) }
 	/// Set the depth test to pass if `value >= reference_value`.	
 	pub fn depth_test_greater_or_equal(self) -> Self { self.depth_test_op(Compare::GreaterOrEqual) }
-	/// Set the depth test to always pass. (default?)
+	/// Set the depth test to always pass (default).
 	pub fn depth_test_always(self) -> Self { self.depth_test_op(Compare::Always) }
+
+	/// Use basic forward depth test.
+	/// 
+	/// Shortcut for `depth_write(true)` and `depth_test_less()`.
+	pub fn basic_depth_test(self) -> Self { self.depth_write(true).depth_test_less() }
+	/// Use basic inverse depth test.
+	/// 
+	/// Should be used with inverse depth buffer.
+	/// Shortcut for `depth_write(true)` and `depth_test_greater()`.
+	pub fn inverse_depth_test(self) -> Self { self.depth_write(true).depth_test_greater() }
 
 	/// Use given vertex shader with given specialization constants.
 	pub fn vertex_shader<S, SC>(self, shader: S, specialization: SC)

@@ -1,22 +1,34 @@
 # Changelog
 
+## 0.0.7 Textured Cube
+
+- **!IMPORTANT!** removes implicit viewport transformation, this results in:
+  - flipped y-screenspace direction
+  - default depth now works as expected
+- **!BREAKING CHANGE!** device.draw() now requires a descriptor_set
+- **!BREAKING CHANGE!** renames 'device.create_buffer()' to 'device.create_cpu_accessible_buffer()'
+- adds basic_ and inverse_ depth tests to GraphicalPassBuilder
+- introduces descriptor_sets
+- adds phong_cube example
+- forward vulkano::Image items
+
 ## 0.0.6 Building Passes in Frames
 
 - **!BREAKING CHANGE!** refactors Drawing device into 2 sub-states:
   - *Frame* - active frame
   - *PassInFrame* - an active graphical pass within a frame
-- **!BREAKING CHANGE!** refactor GraphicalPass to be struct and not a trait
-- change the example to handle failing resizing device by skipping a frame
-- change the example to work with breaking changes
-- update *'vulkano'* dependency to 0.16.0
-- move re-exports to sub-projects
+- **!BREAKING CHANGE!** refactors GraphicalPass to be struct and not a trait
+- changes the example to handle failing resizing device by skipping a frame
+- changes the example to work with breaking changes
+- updates *'vulkano'* dependency to 0.16.0
+- moves re-exports to sub-projects
   - vulkano is now exported by gaclen::graphics
   - winit is now exported by gaclen::window
   - gaclen::window also directly exports winit items
-- create a split gaclen_shader project that re-exports a tweaked version of vulkano_shader! macro
+- creates a split gaclen_shader project that re-exports a tweaked version of vulkano_shader! macro
   - this drops the necessity of depending on vulkano
   - vulkano can be used from gaclen::graphics::vulkano
-- create GraphicalPassBuilder for initializing a GraphicalPass
+- creates GraphicalPassBuilder for initializing a GraphicalPass
 
 ## 0.0.5 PresentMode
 

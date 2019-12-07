@@ -1,5 +1,8 @@
 use super::builder::GraphicalPassBuilder;
 
+use vulkano::pipeline::GraphicsPipelineAbstract;
+use vulkano::descriptor::descriptor_set::{PersistentDescriptorSet, PersistentDescriptorSetBuilder};
+
 use std::sync::Arc;
 
 /// Special marker for present passes.
@@ -20,4 +23,15 @@ pub struct GraphicalPass<P : ?Sized, RP : ?Sized, PP> {
 
 impl GraphicalPass<(), (), ()> {
 	pub fn start() -> GraphicalPassBuilder<(), (), (), (), ()> { GraphicalPassBuilder::new() }
+}
+
+impl<P, RP, PP> GraphicalPass<P, RP, PP>
+where
+	P : GraphicsPipelineAbstract + Send + Sync + ?Sized,
+	RP : ?Sized,
+{
+	/// Start building a new persistent descriptor set.
+	pub fn start_persistent_descriptor_set(&self, index: usize) -> PersistentDescriptorSetBuilder<Arc<P>, ()> {
+		PersistentDescriptorSet::start(self.pipeline.clone(), index)
+	}
 }

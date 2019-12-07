@@ -17,18 +17,20 @@ use super::pass::{GraphicalPass, PresentPass};
 
 use std::sync::Arc;
 
-use vulkano::buffer::{CpuAccessibleBuffer};
-use vulkano::format::Format;
-use vulkano::image::{AttachmentImage, ImageCreationError};
-use vulkano::framebuffer::{Framebuffer, RenderPassAbstract};
-use vulkano::pipeline::viewport::Viewport;
+use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer, CpuBufferPool};
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
+use vulkano::descriptor::descriptor_set::DescriptorSetsCollection;
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
-use vulkano::image::SwapchainImage;
+use vulkano::format::{AcceptsPixels, Format, FormatDesc};
+use vulkano::framebuffer::{Framebuffer, RenderPassAbstract};
+use vulkano::image::{AttachmentImage, ImageCreationError, SwapchainImage};
+use vulkano::pipeline::viewport::Viewport;
+use vulkano::pipeline::GraphicsPipelineAbstract;
+use vulkano::sampler::{Filter, Sampler, SamplerCreationError, SamplerAddressMode, MipmapMode};
 use vulkano::instance::PhysicalDevice;
+use vulkano::image::{Dimensions, ImmutableImage};
 use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
-use vulkano::pipeline::GraphicsPipelineAbstract;
 
 pub use vulkano::swapchain::PresentMode;
 
@@ -48,10 +50,11 @@ pub struct Device {
 	pub(super) swapchain_images: Vec<Arc<SwapchainImage<Arc<Window>>>>,
 	pub(super) swapchain_depths: Vec<Arc<AttachmentImage>>,
 	pub(super) swapchain_depth_format: Format,
+	pub(super) inverse_depth: bool,
 
 	pub(super) dynamic_state: DynamicState,
 
-	pub(super) last_frame: Option<Box<dyn GpuFuture>>,
+	pub(super) before_frame: Option<Box<dyn GpuFuture>>,
 }
 
 /// A device that is in the middle of drawing a frame.
@@ -100,6 +103,7 @@ pub enum FrameFinishError {
 	Commands(CommandBufferExecError),
 }
 
+// General
 impl Device {
 	// TODO: add create() function with all parameters and use with_* for setting individual non-default parameters and new() with all default parameters.
 
@@ -141,13 +145,28 @@ impl Device {
 			swapchain_images,
 			swapchain_depths,
 			swapchain_depth_format,
+			inverse_depth: false,
 			dynamic_state,
-			last_frame: None,
+			before_frame: None,
 		};
 
-		resize_dynamic_state_viewport(&mut device.dynamic_state, dimensions);
+		resize_dynamic_state_viewport(&mut device.dynamic_state, dimensions, false);
 
 		Ok(device)
+	}
+
+	/// Set the depth buffer to use forward (inverse == false) or inverse range.
+	/// 
+	/// Forward range is 0.0 being the front and the 1.0 being the away.
+	/// Inverse range is 1.0 the front and 0.0 being the away.
+	/// The advantages of different approaches are to be researched by the reader.
+	pub fn inverse_depth(&mut self, inverse: bool) {
+		self.inverse_depth = inverse;
+		let dimensions = {
+			let dimensions = self.swapchain_depths[0].dimensions();
+			(dimensions[0], dimensions[1])
+		};
+		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, inverse);
 	}
 
 	/// Update the device for the resized window.
@@ -157,7 +176,7 @@ impl Device {
 			None => return Err(ResizeError::UnsizedWindow),
 		};
 
-		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions);
+		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, self.inverse_depth);
 
 		// TODO: investigate weird UnsupportedDimensions swapchain error on some resizes
 		let (swapchain, images) = self.swapchain.recreate_with_dimension([dimensions.0, dimensions.1])?;
@@ -188,7 +207,7 @@ impl Device {
 			Err(err) => return Err((self, err)),
 		};
 
-		let time: Box<dyn GpuFuture> = match self.last_frame.take() {
+		let time: Box<dyn GpuFuture> = match self.before_frame.take() {
 			Some(mut time) => {
 				time.cleanup_finished();
 				Box::new(time.join(image_acquire_time))
@@ -207,15 +226,125 @@ impl Device {
 		Ok(frame)
 	}
 
-	/// Create a basic buffer for data for processing on the GPU.
-	pub fn create_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, vulkano::memory::DeviceMemoryAllocError> {
-		CpuAccessibleBuffer::from_iter(self.device.clone(), vulkano::buffer::BufferUsage::all(), data_iterator)
-	}
-
 	/// Get the underlying logical device (useful for supplying to own shaders).
 	pub fn logical_device(&self) -> Arc<LogicalDevice> { self.device.clone() }
 }
 
+// Buffers
+impl Device {
+	/// Create a basic buffer for data for processing on the GPU.
+	/// 
+	/// These are useful for quick prototyping, as these are typically placed in shared memory (system based RAM, accessed by GPU through the bus).
+	pub fn create_cpu_accessible_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, vulkano::memory::DeviceMemoryAllocError> {
+		CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), data_iterator)
+	}
+
+	/// Create a pool of small CPU-accessible buffers.
+	/// 
+	/// These are particularly useful for regularly changing data, such as object uniforms.
+	pub fn create_cpu_buffer_pool<T: 'static>(&self, usage: BufferUsage) -> CpuBufferPool<T> {
+		CpuBufferPool::<T>::new(self.device.clone(), usage)
+	}
+}
+
+// Images
+impl Device {
+	/// Create an [ImmutableImage] from a data iterator.
+	/// 
+	/// Uploads data to the GPU (in a non-blocking fashion).
+	pub fn create_immutable_image_from_iter<P, I, F>(&mut self, data_iterator: I, dimensions: Dimensions, format: F)
+	-> Result<Arc<ImmutableImage<F>>, ImageCreationError>
+	where
+		P : Send + Sync + Clone + 'static,
+		F : FormatDesc + AcceptsPixels<P> + Send + Sync + 'static,
+		I : ExactSizeIterator<Item = P>,
+		Format: AcceptsPixels<P>,
+	{
+		let (image, future) = ImmutableImage::from_iter(data_iterator, dimensions, format, self.transfer_queue.clone())?;
+
+		// TODO: handle synchronization between separate queues in a preferment way
+		future.flush().unwrap();
+
+		// let time: Box<dyn GpuFuture> = match self.before_frame.take() {
+		// 	Some(time) => Box::new(time.join(future)),
+		// 	None => Box::new(future),
+		// };
+		// self.before_frame = Some(time);
+
+		Ok(image)
+	}
+
+	/// Creates a new [Sampler] (image viewer) with the given behavior.
+    ///
+    /// `magnifying_filter` and `minifying_filter` define how the implementation should sample from the image
+    /// when it is respectively larger and smaller than the original.
+    ///
+    /// `mipmap_mode` defines how the implementation should choose which mipmap to use.
+    ///
+    /// `address_u`, `address_v` and `address_w` define how the implementation should behave when
+    /// sampling outside of the texture coordinates range `[0.0, 1.0]`.
+    ///
+    /// `mip_lod_bias` is a value to add to .
+    ///
+    /// `max_anisotropy` must be greater than or equal to 1.0. If greater than 1.0, the
+    /// implementation will use anisotropic filtering. Using a value greater than 1.0 requires
+    /// the `sampler_anisotropy` feature to be enabled when creating the device.
+    ///
+    /// `min_lod` and `max_lod` are respectively the minimum and maximum mipmap level to use.
+    /// `max_lod` must always be greater than or equal to `min_lod`.
+    ///
+    /// # Panic
+    ///
+    /// - Panics if multiple `ClampToBorder` values are passed and the border color is different.
+    /// - Panics if `max_anisotropy < 1.0`.
+    /// - Panics if `min_lod > max_lod`.
+	pub fn create_sampler(
+		&self,
+		magnifying_filter: Filter,
+		minifying_filter: Filter,
+		mipmap_mode: MipmapMode,
+		address_u: SamplerAddressMode,
+		address_v: SamplerAddressMode,
+		address_w: SamplerAddressMode,
+		mip_lod_bias: f32,
+		max_anisotropy: f32,
+		min_lod: f32,
+		max_lod: f32
+	) -> Result<Arc<Sampler>, SamplerCreationError> {
+		Sampler::new(
+			self.device.clone(),
+			magnifying_filter,
+			minifying_filter,
+			mipmap_mode,
+			address_u,
+			address_v,
+			address_w,
+			mip_lod_bias,
+			max_anisotropy,
+			min_lod,
+			max_lod
+		)
+	}
+
+	/// Shortcut for creating a simple sampler with default settings that is useful for prototyping.
+	pub fn create_simple_linear_repeat_sampler(&self) -> Result<Arc<Sampler>, SamplerCreationError>
+	{
+		self.create_sampler(
+			Filter::Linear,
+			Filter::Linear,
+			MipmapMode::Linear,
+			SamplerAddressMode::Repeat,
+			SamplerAddressMode::Repeat,
+			SamplerAddressMode::Repeat,
+			0.0,
+			1.0,
+			0.0,
+			1_000.0
+		)
+	}
+}
+
+// Member exposure
 #[cfg(feature = "expose-underlying-vulkano")]
 impl Device {
 	/// Get the [vulkano device queue](DeviceQueue) used for graphical operations.
@@ -276,7 +405,7 @@ impl Frame {
 			Ok(future) => future,
 			Err(err) => return Err((self.device, FrameFinishError::Flush(err))),
 		};
-		let device = Device { last_frame: Some(Box::new(after_frame)), .. self.device };
+		let device = Device { before_frame: Some(Box::new(after_frame)), .. self.device };
 		Ok(device)
 	}
 }
@@ -291,12 +420,15 @@ where
 	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
 	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
 	#[inline]
-	pub fn draw<PC>(
+	pub fn draw<DSC, PC>(
 		mut self,
 		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
+		descriptor_sets: DSC,
 		push_constants: PC
-	) -> Self {
-		self.frame.commands = self.frame.commands.draw(self.pass.pipeline.clone(), &self.frame.device.dynamic_state, vertex_buffer, (), push_constants).unwrap();
+	) -> Self
+	where DSC: DescriptorSetsCollection
+	{
+		self.frame.commands = self.frame.commands.draw(self.pass.pipeline.clone(), &self.frame.device.dynamic_state, vertex_buffer, descriptor_sets, push_constants).unwrap();
 		self
 	}
 
@@ -451,11 +583,11 @@ fn unpack_queues(mut queues: Vec<Arc<DeviceQueue>>) -> [Arc<DeviceQueue>; 3] {
 	}
 }
 
-fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (u32, u32)) {
+fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (u32, u32), inverse: bool) {
 	let viewport = Viewport {
-		origin: [ 0.0, dimensions.1 as f32],
-		dimensions: [dimensions.0 as f32, -(dimensions.1 as f32)],
-		depth_range: 1.0 .. 0.0,
+		origin: [0.0, 0.0],
+		dimensions: [dimensions.0 as f32, dimensions.1 as f32],
+		depth_range: if inverse { 1.0 .. 0.0 } else { 0.0 .. 1.0 },
 	};
 	
 	match dynamic_state.viewports {

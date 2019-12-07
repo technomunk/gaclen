@@ -6,9 +6,11 @@
   - flipped y-screenspace direction
   - default depth now works as expected
 - **!BREAKING CHANGE!** device.draw() now requires a descriptor_set
+- **!BREAKING CHANGE!** renames 'device.create_buffer()' to 'device.create_cpu_accessible_buffer()'
 - adds basic_ and inverse_ depth tests to GraphicalPassBuilder
 - introduces descriptor_sets
 - adds phong_cube example
+- forward vulkano::Image items
 
 ## 0.0.6 Building Passes in Frames
 

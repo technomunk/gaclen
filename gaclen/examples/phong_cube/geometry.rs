@@ -13,53 +13,53 @@ pub struct Vertex {
 gaclen::graphics::impl_vertex!(Vertex, position, normal, uv);
 
 pub fn generate_cube(device: &GaclenDevice) -> Result<Arc<CpuAccessibleBuffer<[Vertex]>>, DeviceMemoryAllocError> {
-	device.create_buffer([
+	device.create_cpu_accessible_buffer([
 		// X-
-		Vertex { position: [ -0.5,  0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 0.0, 0.0 ] },
-		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 1.0, 0.0 ] },
-		Vertex { position: [ -0.5,  0.5,  0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 0.0, 1.0 ] },
-		Vertex { position: [ -0.5,  0.5,  0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 0.0, 1.0 ] },
-		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 1.0, 0.0 ] },
-		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [ -0.5,  0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 0.0, 1.0 ] },
+		Vertex { position: [ -0.5,  0.5,  0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [ -0.5,  0.5,  0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 0.0, 1.0 ] },
+		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 0.0, 0.0 ] },
 		
 		// X+
-		Vertex { position: [  0.5, -0.5, -0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 0.0, 0.0 ] },
-		Vertex { position: [  0.5,  0.5, -0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 1.0, 0.0 ] },
-		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 0.0, 1.0 ] },
-		Vertex { position: [  0.5, -0.5, -0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [  0.5, -0.5, -0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [  0.5,  0.5, -0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 0.0, 1.0 ] },
+		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [  0.5, -0.5, -0.5 ], normal: [ 1.0, 0.0, 0.0 ], uv: [ 1.0, 1.0 ] },
 
 		// Y-
-		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 1.0, 0.0 ] },
-		Vertex { position: [  0.5, -0.5, -0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 0.0, 0.0 ] },
-		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 0.0, 1.0 ] },
-		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 0.0, 1.0 ] },
-		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 0.0, 1.0 ] },
+		Vertex { position: [  0.5, -0.5, -0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ 0.0, -1.0, 0.0 ], uv: [ 0.0, 1.0 ] },
 
 		// Y+
-		Vertex { position: [ -0.5, 0.5, -0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 0.0, 0.0 ] },
-		Vertex { position: [  0.5, 0.5,  0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [  0.5, 0.5, -0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 1.0, 0.0 ] },
-		Vertex { position: [  0.5, 0.5,  0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [ -0.5, 0.5, -0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 0.0, 0.0 ] },
-		Vertex { position: [ -0.5, 0.5,  0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 0.0, 1.0 ] },
+		Vertex { position: [ -0.5, 0.5, -0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [  0.5, 0.5,  0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [  0.5, 0.5, -0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 0.0, 1.0 ] },
+		Vertex { position: [  0.5, 0.5,  0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [ -0.5, 0.5, -0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [ -0.5, 0.5,  0.5 ], normal: [ 0.0, 1.0, 0.0 ], uv: [ 1.0, 0.0 ] },
 		
 		// Z-
-		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 0.0, 0.0 ] },
-		Vertex { position: [ -0.5,  0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 0.0, 1.0 ] },
-		Vertex { position: [  0.5,  0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [  0.5,  0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [  0.5, -0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 1.0, 0.0 ] },
-		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [ -0.5,  0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [  0.5,  0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [  0.5,  0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [  0.5, -0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 0.0, 1.0 ] },
+		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ 0.0, 0.0, -1.0 ], uv: [ 1.0, 1.0 ] },
 
 		// Z+
-		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 0.0, 0.0 ] },
-		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [ -0.5,  0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 0.0, 1.0 ] },
-		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 1.0, 1.0 ] },
-		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 0.0, 0.0 ] },
-		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [ -0.5,  0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 1.0, 0.0 ] },
+		Vertex { position: [  0.5,  0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 0.0, 0.0 ] },
+		Vertex { position: [ -0.5, -0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 1.0, 1.0 ] },
+		Vertex { position: [  0.5, -0.5,  0.5 ], normal: [ 0.0, 0.0, 1.0 ], uv: [ 0.0, 1.0 ] },
 	].iter().cloned())
 }

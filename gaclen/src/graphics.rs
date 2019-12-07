@@ -11,9 +11,11 @@ pub mod pass;
 /// used for hardware acceleration.
 pub use vulkano;
 pub use vulkano::impl_vertex;
-pub use vulkano::instance::Version;
 pub use vulkano::buffer::BufferUsage;
-pub use vulkano::descriptor::*;
+pub use vulkano::format::Format as PixelFormat;
+pub use vulkano::image::Dimensions;
+pub use vulkano::instance::Version;
+pub use vulkano::sampler::{Filter as TextureFilter, SamplerAddressMode, MipmapMode};
 
 const REQUIRED_VULKAN_VERSION: Version = Version { major: 1, minor: 0, patch: 0 };
 const ENGINE_NAME: &str = "gaclen";

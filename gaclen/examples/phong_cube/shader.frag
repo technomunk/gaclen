@@ -10,6 +10,7 @@ layout(set = 1, binding = 0) uniform LightData {
 	vec4 diffuse;
 	vec4 specular;
 } u_light;
+layout(set = 1, binding = 1) uniform sampler2D u_texture;
 
 layout(location = 0) out vec4 out_color;
 
@@ -29,5 +30,5 @@ void main() {
 		u_light.ambient.xyz +
 		u_light.diffuse.xyz * lambertian * u_light.diffuse.w / light_dist +
 		u_light.specular.xyz * specular / light_dist;
-	out_color = vec4(color, 1);
+	out_color = vec4(color * texture(u_texture, in_uv).xyz, 1);
 }

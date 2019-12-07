@@ -2,7 +2,6 @@ use super::builder::GraphicalPassBuilder;
 
 use vulkano::pipeline::GraphicsPipelineAbstract;
 use vulkano::descriptor::descriptor_set::{PersistentDescriptorSet, PersistentDescriptorSetBuilder};
-use vulkano::descriptor::PipelineLayoutAbstract;
 
 use std::sync::Arc;
 

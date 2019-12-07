@@ -51,7 +51,7 @@ fn main() {
 			.build_present_pass(&device).unwrap()
 	};
 
-	let triangle_buffer = device.create_buffer([
+	let triangle_buffer = device.create_cpu_accessible_buffer([
 		Vertex { position: [-0.5, 0.5, 0.0 ], color: [ 0.25, 0.75, 0.25, 1.0 ] },
 		Vertex { position: [ 0.5,-0.5, 0.0 ], color: [ 0.75, 0.25, 0.25, 1.0 ] },
 		Vertex { position: [ 0.5, 0.5, 0.0 ], color: [ 0.75, 0.75, 0.25, 0.0 ] },

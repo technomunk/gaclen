@@ -18,8 +18,6 @@ use gaclen::window::{
 	Event, WindowEvent,
 };
 
-use cgmath::Rotation3;
-
 use std::sync::Arc;
 
 fn main() {
@@ -57,6 +55,17 @@ fn main() {
 
 	let transform_buffer_pool = device.create_cpu_buffer_pool::<shaders::vertex::ty::TransformData>(graphics::BufferUsage::all());
 	let light_buffer_pool = device.create_cpu_buffer_pool::<shaders::fragment::ty::LightData>(graphics::BufferUsage::all());
+
+	let texture = {
+		let image = image::open("gaclen/examples/phong_cube/texture.png").unwrap().to_rgba();
+		let (width, height) = image.dimensions();
+        let dimensions = graphics::Dimensions::Dim2d { width, height };
+		let image_data = image.into_raw(); // to_rgba() returns Vec<u8> backed container
+		
+		device.create_immutable_image_from_iter(image_data.iter().cloned(), dimensions, graphics::PixelFormat::R8G8B8A8Srgb).unwrap()
+	};
+
+	let sampler = device.create_simple_linear_repeat_sampler().unwrap();
 	
 	let light = {
 		let data = shaders::fragment::ty::LightData {
@@ -70,6 +79,7 @@ fn main() {
 
 	let light_descriptor_set = Arc::new(albedo_pass.start_persistent_descriptor_set(1)
 		.add_buffer(light).unwrap()
+		.add_sampled_image(texture, sampler).unwrap()
 		.build().unwrap());
 
 	let mut recreate_swapchain = false;

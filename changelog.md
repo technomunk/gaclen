@@ -5,12 +5,15 @@
 - **!IMPORTANT!** removes implicit viewport transformation, this results in:
   - flipped y-screenspace direction
   - default depth now works as expected
-- **!BREAKING CHANGE!** device.draw() now requires a descriptor_set
-- **!BREAKING CHANGE!** renames 'device.create_buffer()' to 'device.create_cpu_accessible_buffer()'
+- **!BREAKING CHANGE!** Device::draw() now requires a descriptor_set
+- **!BREAKING CHANGE!** renames 'Device::create_buffer()' to 'Device::create_cpu_accessible_buffer()'
 - adds basic_ and inverse_ depth tests to GraphicalPassBuilder
-- introduces descriptor_sets
+- adds descriptor sets
+  - adds GraphicalPass::start_persistent_descriptor_set()
+- adds image support
+  - adds Device::create_immutable_image_from_iter()
+  - adds Device::create_sampler() and Device::create_simple_linear_repeat_sampler()
 - adds phong_cube example
-- forward vulkano::Image items
 
 ## 0.0.6 Building Passes in Frames
 

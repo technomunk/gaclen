@@ -6,3 +6,4 @@
 - Using *'cargo doc'* command to debug documentation.
 - One can define additional generic trait names for trait-bounding purposes.
 - A guaranteed result should be in both parts of Result<> struct. The reason is - it still allows for Result comfort functionality, non-discard rule and short-circuit '?', unlike pairing (result, Result<(), _>).
+- A struct may have multiple impl {} blocks, allowing for more modular definitions of many-method structures.

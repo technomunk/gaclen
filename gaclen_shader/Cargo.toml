@@ -1,6 +1,6 @@
 [package]
 name = "gaclen_shader"
-version = "0.0.6"
+version = "0.0.8"
 authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
 edition = "2018"
 
@@ -8,6 +8,9 @@ description = "Tweaked re-export of vulkano_shader! procedural macro."
 keywords = ["gaclen", "vulkan", "macro"]
 categories = ["graphics", "rust-patterns"]
 license = "MIT"
+
+repository = "https://github.com/Griffone/gaclen"
+documentation = "https://docs.rs/gaclen"
 
 [lib]
 proc-macro = true

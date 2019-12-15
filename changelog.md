@@ -1,34 +1,47 @@
 # Changelog
 
+## 0.0.8 Mutated Immutable Docs
+
+- fixes and improves documentation for `Device`:
+  - fixes broken links
+  - extends some method documentation
+  - lists panic scenarios for some methods
+- adds device-local `ImmutableBuffer` functionality
+- adds `PassInFrame::draw_indexed()` functionality
+- `PassInFrame::draw()` methods should now have static-dispatch
+
 ## 0.0.7 Textured Cube
 
 - **!IMPORTANT!** removes implicit viewport transformation, this results in:
   - flipped y-screenspace direction
   - default depth now works as expected
-- **!BREAKING CHANGE!** device.draw() now requires a descriptor_set
-- **!BREAKING CHANGE!** renames 'device.create_buffer()' to 'device.create_cpu_accessible_buffer()'
-- adds basic_ and inverse_ depth tests to GraphicalPassBuilder
-- introduces descriptor_sets
+- **!BREAKING CHANGE!** `Device::draw()` now requires a descriptor_set
+- **!BREAKING CHANGE!** renames `Device::create_buffer()` to `Device::create_cpu_accessible_buffer()`
+- adds basic_ and inverse_ depth tests to `GraphicalPassBuilder`
+- adds descriptor sets
+  - adds `GraphicalPass::start_persistent_descriptor_set()`
+- adds image support
+  - adds `Device::create_immutable_image_from_iter()`
+  - adds `Device::create_sampler()` and `Device::create_simple_linear_repeat_sampler()`
 - adds phong_cube example
-- forward vulkano::Image items
 
 ## 0.0.6 Building Passes in Frames
 
 - **!BREAKING CHANGE!** refactors Drawing device into 2 sub-states:
   - *Frame* - active frame
   - *PassInFrame* - an active graphical pass within a frame
-- **!BREAKING CHANGE!** refactors GraphicalPass to be struct and not a trait
+- **!BREAKING CHANGE!** refactors `GraphicalPass` to be struct and not a trait
 - changes the example to handle failing resizing device by skipping a frame
 - changes the example to work with breaking changes
 - updates *'vulkano'* dependency to 0.16.0
 - moves re-exports to sub-projects
-  - vulkano is now exported by gaclen::graphics
-  - winit is now exported by gaclen::window
-  - gaclen::window also directly exports winit items
+  - vulkano is now exported by `gaclen::graphics`
+  - winit is now exported by `gaclen::window`
+  - `gaclen::window` also directly exports winit items
 - creates a split gaclen_shader project that re-exports a tweaked version of vulkano_shader! macro
   - this drops the necessity of depending on vulkano
-  - vulkano can be used from gaclen::graphics::vulkano
-- creates GraphicalPassBuilder for initializing a GraphicalPass
+  - vulkano can be used from `gaclen::graphics::vulkano`
+- creates `GraphicalPassBuilder` for initializing a `GraphicalPass`
 
 ## 0.0.5 PresentMode
 

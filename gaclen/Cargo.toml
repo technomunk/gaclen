@@ -1,6 +1,6 @@
 [package]
 name = "gaclen"
-version = "0.0.6"
+version = "0.0.8"
 authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
 edition = "2018"
 
@@ -26,4 +26,4 @@ vulkano-win = "0.16.0" # vulkan-winit linkage
 [dev-dependencies]
 cgmath = "0.17.0" # linear algebra library
 image = "0.22.3"
-gaclen_shader = { path = "../gaclen_shader", version = "0.0.6" }
+gaclen_shader = { path = "../gaclen_shader", version = "0.0.8" }

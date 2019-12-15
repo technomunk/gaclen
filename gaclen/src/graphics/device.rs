@@ -2,13 +2,19 @@
 //! 
 //! In order to get an image using a [Device](struct.Device.html) one needs to:
 //! 1. [Create it](struct.Device.html#method.new).
-//! 2. [Create a render-pass](trait.Pass.html).
-//! 3. [Create a data-buffer](struct.Device.html#method.create_buffer).
+//! 2. [Create a render-pass](struct.GraphicalPassBuilder.html).
+//! 3. [Create a data-buffer](struct.Device.html#method.create_cpu_accessible_buffer).
 //! 4. [Start a frame](struct.Device.html#method.start_frame).
-//! 5. [Draw using a pass](struct.DrawingDevice.html#method.draw).
-//! 6. [Finish the frame](struct.DrawingDevice.html#method.finish_frame).
+//! 5. [Start a pass](struct.Frame.html#method.begin_pass).
+//! 6. [Draw using a pass](struct.PassInFrame.html#method.draw).
+//! 7. [Finish the pass](struct.PassInFrame.html#method.finish_pass).
+//! 8. Repeat steps `5-7` as necessary.
+//! 9. [Finish the frame](struct.Frame.html#method.finish_frame).
 //! 
-//! Note that during the middle of the frame the device switches to [DrawingDevice](struct.DrawingDevice.html) struct, which represents 'middle of frame' state.
+//! Note that the above has 3 states:
+//! - [Device] : normal (default) state, most functionality is available.
+//! - [Frame] : the device is in the middle of drawing a frame, only [starting a pass](struct.Frame.html#method.begin_pass) and [finishing the frame](struct.Frame.html#method.finish_frame) are available.
+//! - [PassInFrame] : the device is in the middle of drawing a frame with a specific setup ([GraphicalPass]). Only the [drawing](struct.PassInFrame.html#method.draw) and [finishing the pass](struct.PassInFrame.html#method.finish_pass) are available.
 
 use crate::window::Window;
 use super::context::Context;
@@ -17,20 +23,23 @@ use super::pass::{GraphicalPass, PresentPass};
 
 use std::sync::Arc;
 
-use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer, CpuBufferPool};
+use vulkano::buffer::{BufferAccess, BufferUsage, CpuAccessibleBuffer, CpuBufferPool, TypedBufferAccess, ImmutableBuffer};
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
 use vulkano::descriptor::descriptor_set::DescriptorSetsCollection;
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
 use vulkano::format::{AcceptsPixels, Format, FormatDesc};
 use vulkano::framebuffer::{Framebuffer, RenderPassAbstract};
 use vulkano::image::{AttachmentImage, ImageCreationError, SwapchainImage};
+use vulkano::pipeline::input_assembly::Index;
 use vulkano::pipeline::viewport::Viewport;
+use vulkano::pipeline::vertex::VertexSource;
 use vulkano::pipeline::GraphicsPipelineAbstract;
 use vulkano::sampler::{Filter, Sampler, SamplerCreationError, SamplerAddressMode, MipmapMode};
 use vulkano::instance::PhysicalDevice;
 use vulkano::image::{Dimensions, ImmutableImage};
 use vulkano::swapchain::{Surface, Swapchain, SwapchainCreationError};
 use vulkano::sync::{GpuFuture, FlushError};
+use vulkano::memory::DeviceMemoryAllocError;
 
 pub use vulkano::swapchain::PresentMode;
 
@@ -39,6 +48,7 @@ type ImageFormat = (vulkano::format::Format, vulkano::swapchain::ColorSpace);
 /// A device responsible for hardware-accelerated computations.
 /// 
 /// It is responsible for recording, submitting and synchronizing commands and data to the GPU.
+/// The device structure contains some state information for synchronization purposes.
 pub struct Device {
 	pub(super) device: Arc<LogicalDevice>,
 
@@ -200,6 +210,10 @@ impl Device {
 	/// Takes ownership of the [Device](struct.Device.html) and converts it to a [Frame](struct.Frame.html).
 	/// This corresponds to switching to the special 'middle of frame' state, that caches intermediate commands before submitting them to the GPU.
 	/// In order to draw after beginning the frame, one needs to [begin a pass](struct.Frame.html#method.begin_pass).
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to initialize the command buffer.
 	#[inline]
 	pub fn begin_frame(mut self) -> Result<Frame, (Self, vulkano::swapchain::AcquireError)> {
 		let (image_index, image_acquire_time) = match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
@@ -235,7 +249,7 @@ impl Device {
 	/// Create a basic buffer for data for processing on the GPU.
 	/// 
 	/// These are useful for quick prototyping, as these are typically placed in shared memory (system based RAM, accessed by GPU through the bus).
-	pub fn create_cpu_accessible_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, vulkano::memory::DeviceMemoryAllocError> {
+	pub fn create_cpu_accessible_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, DeviceMemoryAllocError> {
 		CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), data_iterator)
 	}
 
@@ -245,14 +259,58 @@ impl Device {
 	pub fn create_cpu_buffer_pool<T: 'static>(&self, usage: BufferUsage) -> CpuBufferPool<T> {
 		CpuBufferPool::<T>::new(self.device.clone(), usage)
 	}
+
+	/// Create a device-local immutable buffer from some data.
+	/// 
+	/// Builds an intermediate memory-mapped buffer, writes data to it, builds a copy (upload) command buffer and executes it.
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to submit the copy command buffer.
+	pub fn create_immutable_buffer_from_data<T>(&self, data: T, usage: BufferUsage) -> Result<Arc<ImmutableBuffer<T>>, DeviceMemoryAllocError>
+	where
+		T : Send + Sync + Sized + 'static,
+	{
+		let (buffer, future) = ImmutableBuffer::from_data(data, usage, self.transfer_queue.clone())?;
+
+		// TODO: handle synchronization between separate queues in a performant way
+		future.flush().unwrap();
+
+		Ok(buffer)
+	}
+
+	/// Create a device-local immutable buffer from some data iterator.
+	/// 
+	/// Builds an intermediate memory-mapped buffer, writes data to it, builds a copy (upload) command buffer and executes it.
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to submit the copy command buffer.
+	pub fn create_immutable_buffer_from_iter<T>(&self, data_iterator: impl ExactSizeIterator<Item = T>, usage: BufferUsage) -> Result<Arc<ImmutableBuffer<[T]>>, DeviceMemoryAllocError>
+	where
+		T : Send + Sync + Sized + 'static,
+	{
+		let (buffer, future) = ImmutableBuffer::from_iter(data_iterator, usage, self.transfer_queue.clone())?;
+
+		// TODO: handle synchronization between separate queues in a performant way
+		future.flush().unwrap();
+
+		Ok(buffer)
+	}
+
+	// TODO: add more ways to create buffers
 }
 
 // Images
 impl Device {
 	/// Create an [ImmutableImage] from a data iterator.
 	/// 
-	/// Uploads data to the GPU (in a non-blocking fashion).
-	pub fn create_immutable_image_from_iter<P, I, F>(&mut self, data_iterator: I, dimensions: Dimensions, format: F)
+	/// Builds an intermediate memory-mapped buffer, writes data to it, builds a copy (upload) command buffer and executes it.
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to submit the copy command buffer.
+	pub fn create_immutable_image_from_iter<P, I, F>(&self, data_iterator: I, dimensions: Dimensions, format: F)
 	-> Result<Arc<ImmutableImage<F>>, ImageCreationError>
 	where
 		P : Send + Sync + Clone + 'static,
@@ -262,7 +320,7 @@ impl Device {
 	{
 		let (image, future) = ImmutableImage::from_iter(data_iterator, dimensions, format, self.transfer_queue.clone())?;
 
-		// TODO: handle synchronization between separate queues in a preferment way
+		// TODO: handle synchronization between separate queues in a performant way
 		future.flush().unwrap();
 
 		// let time: Box<dyn GpuFuture> = match self.before_frame.take() {
@@ -366,6 +424,11 @@ impl Device {
 
 impl Frame {
 	/// Begin a PresentPass (the results will be visible on the screen).
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to create the [framebuffer](https://vulkan.lunarg.com/doc/view/1.0.26.0/linux/vkspec.chunked/ch07s03.html) structure for the pass.
+	/// - Panics if fails to begin the [renderpass](https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch07.html) command.
 	pub fn begin_pass<'a, P, RP>(
 		mut self,
 		pass: &'a GraphicalPass<P, RP, PresentPass>,
@@ -390,6 +453,10 @@ impl Frame {
 	/// Finish drawing the frame and flush the commands to the GPU.
 	/// 
 	/// Releases the Device to allow starting a new frame, allocate new resources and anything else a [Device] is able to do.
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to build (finalize) the command buffer.
 	#[inline]
 	pub fn finish_frame(self) -> Result<Device, (Device, FrameFinishError)> {
 		let commands = self.commands.build().unwrap();
@@ -415,26 +482,64 @@ where
 	P : ?Sized + GraphicsPipelineAbstract + Send + Sync + 'static,
 	RP : ?Sized,
 {
+	// TODO: non-polymorphic vertex_buffer drawing
+
 	/// Draw some data using a pass.
 	/// 
 	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
 	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to write draw commands to the command buffer.
 	#[inline]
-	pub fn draw<DSC, PC>(
+	pub fn draw<VB, DSC, PC>(
 		mut self,
-		vertex_buffer: Vec<Arc<dyn vulkano::buffer::BufferAccess + Send + Sync>>,
+		vertex_buffer: VB,
 		descriptor_sets: DSC,
 		push_constants: PC
 	) -> Self
-	where DSC: DescriptorSetsCollection
+	where
+		P : VertexSource<VB>,
+		DSC : DescriptorSetsCollection,
 	{
 		self.frame.commands = self.frame.commands.draw(self.pass.pipeline.clone(), &self.frame.device.dynamic_state, vertex_buffer, descriptor_sets, push_constants).unwrap();
+		self
+	}
+
+	/// Draw some indexed vertex data using a pass.
+	/// 
+	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
+	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to write draw commands to the command buffer.
+	#[inline]
+	pub fn draw_indexed<VB, IB, DSC, PC, I>(
+		mut self,
+		vertex_buffer: VB,
+		index_buffer: IB,
+		descriptor_sets: DSC,
+		push_constants: PC
+	) -> Self
+	where
+		P : VertexSource<VB>,
+		DSC : DescriptorSetsCollection,
+		IB : BufferAccess + TypedBufferAccess<Content = [I]> + Send + Sync + 'static,
+		I : Index + 'static,
+	{
+		self.frame.commands = self.frame.commands.draw_indexed(self.pass.pipeline.clone(), &self.frame.device.dynamic_state, vertex_buffer, index_buffer, descriptor_sets, push_constants).unwrap();
 		self
 	}
 
 	/// Finish using a GraphicalPass.
 	/// 
 	/// Releases the consumed [Frame] to begin the next pass or finish the frame.
+	/// 
+	/// # Panic.
+	/// 
+	/// - Panics if fails to write end [renderpass](https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch07.html) command to the command buffer.
 	#[inline]
 	pub fn finish_pass(self) -> Frame {
 		let commands = self.frame.commands.end_render_pass().unwrap();

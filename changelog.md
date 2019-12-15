@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.9
+
+- updates project readme
+
 ## 0.0.8 Mutated Immutable Docs
 
 - fixes and improves documentation for `Device`:

@@ -16,10 +16,12 @@
 //! - [Frame] : the device is in the middle of drawing a frame, only [starting a pass](struct.Frame.html#method.begin_pass) and [finishing the frame](struct.Frame.html#method.finish_frame) are available.
 //! - [PassInFrame] : the device is in the middle of drawing a frame with a specific setup ([GraphicalPass]). Only the [drawing](struct.PassInFrame.html#method.draw) and [finishing the pass](struct.PassInFrame.html#method.finish_pass) are available.
 
+use vulkano::framebuffer::AttachmentsList;
+use vulkano::image::ImageViewAccess;
 use crate::window::Window;
 use super::context::Context;
 use super::ResizeError;
-use super::pass::{GraphicalPass, PresentPass};
+use super::pass::{GraphicalPass, AttachmentCollection, AttachmentType};
 
 use std::sync::Arc;
 
@@ -28,7 +30,7 @@ use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, 
 use vulkano::descriptor::descriptor_set::DescriptorSetsCollection;
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
 use vulkano::format::{AcceptsPixels, Format, FormatDesc};
-use vulkano::framebuffer::{Framebuffer, RenderPassAbstract};
+use vulkano::framebuffer::{AttachmentDescription, Framebuffer, FramebufferBuilder, RenderPassAbstract};
 use vulkano::image::{AttachmentImage, ImageCreationError, SwapchainImage};
 use vulkano::pipeline::input_assembly::Index;
 use vulkano::pipeline::viewport::Viewport;
@@ -76,9 +78,9 @@ pub struct Frame {
 }
 
 /// A device that is in the middle of a draw-pass in a middle of drawing a frame.
-pub struct PassInFrame<'a, P : ?Sized, RP : ?Sized, PP> {
+pub struct PassInFrame<'a, P, AC> {
 	frame: Frame,
-	pass: &'a GraphicalPass<P, RP, PP>,
+	pass: &'a GraphicalPass<P, AC>,
 }
 
 /// Error during device creation.
@@ -429,19 +431,16 @@ impl Frame {
 	/// 
 	/// - Panics if fails to create the [framebuffer](https://vulkan.lunarg.com/doc/view/1.0.26.0/linux/vkspec.chunked/ch07s03.html) structure for the pass.
 	/// - Panics if fails to begin the [renderpass](https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch07.html) command.
-	pub fn begin_pass<'a, P, RP>(
+	pub fn begin_pass<'a, P, AC: AttachmentCollection>(
 		mut self,
-		pass: &'a GraphicalPass<P, RP, PresentPass>,
+		pass: &'a GraphicalPass<P, AC>,
 		clear_values: Vec<vulkano::format::ClearValue>)
-	-> PassInFrame<'a, P, RP, PresentPass>
-	where
-		P : ?Sized,
-		RP : ?Sized + RenderPassAbstract + Send + Sync + 'static,
+	-> PassInFrame<'a, P, AC>
 	{
-		let framebuffer = Framebuffer::start(pass.render_pass.clone())
-			.add(self.device.swapchain_images[self.image_index].clone()).unwrap()
-			.add(self.device.swapchain_depths[self.image_index].clone()).unwrap()
-			.build().unwrap();
+		let framebuffer = {
+			let builder = Framebuffer::start(pass.render_pass.clone());
+			self.append_resources(builder, pass.render_pass.desc()).build().unwrap()
+		};
 		self.commands = self.commands.begin_render_pass(Arc::new(framebuffer), false, clear_values).unwrap();
 
 		PassInFrame {
@@ -475,12 +474,45 @@ impl Frame {
 		let device = Device { before_frame: Some(Box::new(after_frame)), .. self.device };
 		Ok(device)
 	}
+
+	#[inline]
+	fn append_resources<RP, A>(
+		&self,
+		builder: FramebufferBuilder<RP, A>,
+		attachments: (AttachmentType, AttachmentDescription)
+	) -> FramebufferBuilder<RP, (A, Arc<dyn ImageViewAccess + Send + Sync>)>
+	where
+		RP : RenderPassAbstract,
+		A : AttachmentsList,
+	{
+		match attachments.0 {
+			AttachmentType::SwapchainColor => builder.add(self.device.swapchain_images[self.image_index].clone() as _).unwrap(),
+			AttachmentType::SwapchainDepth => builder.add(self.device.swapchain_depths[self.image_index].clone() as _).unwrap(),
+			AttachmentType::General => panic!("Unimplemented!"),
+		}
+	}
+	#[inline]
+	fn append_resources<RP, A>(
+		&self,
+		builder: FramebufferBuilder<RP, A>,
+		attachments: (impl AttachmentCollection, (AttachmentType, AttachmentDescription))
+	) -> FramebufferBuilder<RP, (A, Arc<dyn ImageViewAccess + Send + Sync>)>
+	where
+		RP : RenderPassAbstract,
+		A : AttachmentsList,
+	{
+		let builder = match attachments.1 .0 {
+			AttachmentType::SwapchainColor => builder.add(self.device.swapchain_images[self.image_index].clone() as _).unwrap(),
+			AttachmentType::SwapchainDepth => builder.add(self.device.swapchain_depths[self.image_index].clone() as _).unwrap(),
+			AttachmentType::General => panic!("Unimplemented!"),
+		};
+		self.append_resources::<RP, _>(builder, attachments.0)
+	}
 }
 
-impl<'a, P, RP> PassInFrame<'a, P, RP, PresentPass>
+impl<'a, P> PassInFrame<'a, P>
 where
-	P : ?Sized + GraphicsPipelineAbstract + Send + Sync + 'static,
-	RP : ?Sized,
+	P : GraphicsPipelineAbstract + Send + Sync + 'static,
 {
 	// TODO: non-polymorphic vertex_buffer drawing
 
@@ -773,4 +805,8 @@ fn write_queue_details(fmt: &mut std::fmt::Formatter, queue: &DeviceQueue, prefi
 	writeln!(fmt, "{}transfer: {}", prefix, family.explicitly_supports_transfers())?;
 	writeln!(fmt, "{}compute: {}", prefix, family.supports_compute())?;
 	Ok(())
+}
+
+fn build_framebuffer<RP>(builder: FramebufferBuilder<RP, ()>, attachments: impl AttachmentCollection) -> Framebuffer<_> {
+
 }

@@ -3,25 +3,28 @@ use vulkano::pipeline::depth_stencil::{Compare, DepthStencil};
 use vulkano::pipeline::shader::{SpecializationConstants, GraphicsEntryPointAbstract};
 use vulkano::pipeline::raster::{CullMode, FrontFace, PolygonMode, Rasterization};
 use vulkano::pipeline::vertex::{SingleBufferDefinition, VertexDefinition};
-use vulkano::framebuffer::{RenderPassAbstract, RenderPassCreationError, Subpass};
+use vulkano::framebuffer::{AttachmentDescription, RenderPassDesc, RenderPassCreationError, Subpass};
 
 use crate::graphics;
 use graphics::device::Device;
 use graphics::pass::graphical_pass;
-use graphical_pass::{GraphicalPass, PresentPass};
+use graphical_pass::{AttachmentCollection, AttachmentType, GraphicalPass, GraphicalRenderPassDescription};
 
 use std::sync::Arc;
 
 pub use vulkano::pipeline::input_assembly::PrimitiveTopology;
 
 /// A structure for initializing [GraphicalPasses](struct.GraphicalPass).
-pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
+pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
 	vertex_input: VI,
 	vertex_shader: (VS, VSS),
 	primitive_topology: PrimitiveTopology,
 	rasterization: Rasterization,
 	fragment_shader: (FS, FSS),
 	depth_stencil: DepthStencil,
+
+	attachments: AC,
+	depth_attachment: Option<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,7 +33,7 @@ pub enum BuildError {
 	GraphicsPipelineCreation(GraphicsPipelineCreationError),
 }
 
-impl GraphicalPassBuilder<(), (), (), (), ()> {
+impl GraphicalPassBuilder<(), (), (), (), (), ()> {
 	pub(super) fn new() -> Self {
 		Self {
 			vertex_input: (),
@@ -39,13 +42,16 @@ impl GraphicalPassBuilder<(), (), (), (), ()> {
 			rasterization: Rasterization::default(),
 			fragment_shader: ((), ()),
 			depth_stencil: DepthStencil::default(),
+
+			attachments: (),
+			depth_attachment: None,
 		}
 	}
 }
 
-impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
+impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
 	/// Use provided vertex input type.
-	pub fn vertex_input<T>(self, vertex_input: T) -> GraphicalPassBuilder<T, VS, VSS, FS, FSS> {
+	pub fn vertex_input<T>(self, vertex_input: T) -> GraphicalPassBuilder<T, VS, VSS, FS, FSS, AC> {
 		GraphicalPassBuilder {
 			vertex_input: vertex_input,
 			vertex_shader: self.vertex_shader,
@@ -53,11 +59,14 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 			rasterization: self.rasterization,
 			fragment_shader: self.fragment_shader,
 			depth_stencil: self.depth_stencil,
+
+			attachments: self.attachments,
+			depth_attachment: self.depth_attachment,
 		}
 	}
 
 	/// Use a single buffer of provided vertex type as input.
-	pub fn single_buffer_input<V>(self) -> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VSS, FS, FSS> { self.vertex_input(SingleBufferDefinition::<V>::new()) }
+	pub fn single_buffer_input<V>(self) -> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VSS, FS, FSS, AC> { self.vertex_input(SingleBufferDefinition::<V>::new()) }
 
 	/// Use given [PrimitiveTopology].
 	/// 
@@ -166,7 +175,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 
 	/// Use given vertex shader with given specialization constants.
 	pub fn vertex_shader<S, SC>(self, shader: S, specialization: SC)
-	-> GraphicalPassBuilder<VI, S, SC, FS, FSS> 
+	-> GraphicalPassBuilder<VI, S, SC, FS, FSS, AC> 
 	where
 		S : GraphicsEntryPointAbstract<SpecializationConstants = SC>,
 		SC : SpecializationConstants,
@@ -178,12 +187,15 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 			rasterization: self.rasterization,
 			fragment_shader: self.fragment_shader,
 			depth_stencil: self.depth_stencil,
+
+			attachments: self.attachments,
+			depth_attachment: self.depth_attachment,
 		}
 	}
 
 	/// Use given fragment shader with given specialization constants.
 	pub fn fragment_shader<S, SC>(self, shader: S, specialization: SC)
-	-> GraphicalPassBuilder<VI, VS, VSS, S, SC>
+	-> GraphicalPassBuilder<VI, VS, VSS, S, SC, AC>
 	where
 		S : GraphicsEntryPointAbstract<SpecializationConstants = SC>,
 		SC : SpecializationConstants,
@@ -195,11 +207,14 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 			rasterization: self.rasterization,
 			fragment_shader: (shader, specialization),
 			depth_stencil: self.depth_stencil,
+
+			attachments: self.attachments,
+			depth_attachment: self.depth_attachment,
 		}
 	}
 }
 
-impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS>
+impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC>
 where
 	VS : GraphicsEntryPointAbstract<SpecializationConstants=VSS>,
 	FS : GraphicsEntryPointAbstract<SpecializationConstants=FSS>,
@@ -208,30 +223,17 @@ where
 	VS::PipelineLayout : Send + Sync + Clone + 'static,
 	FS::PipelineLayout : Send + Sync + Clone + 'static,
 	VI : VertexDefinition<VS::InputDefinition> + Send + Sync + 'static,
+	AC : AttachmentCollection + Send + Sync,
 {
-	// TODO: Figure out if these can be switched to static dispatch (impl instead of dyn)
-	pub fn build_present_pass(self, device: &Device)
-	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync, dyn RenderPassAbstract + Send + Sync, PresentPass>, BuildError> {
-		let render_pass = Arc::new(vulkano::single_pass_renderpass!(
-			device.device.clone(),
-			attachments: {
-				color: {
-					load: Clear,
-					store: Store,
-					format: device.swapchain.format(),
-					samples: 1,
-				},
-				depth: {
-					load: Clear,
-					store: DontCare,
-					format: device.swapchain_depth_format,
-					samples: 1,
-				}
-			},
-			pass: {
-				color: [color],
-				depth_stencil: {depth}
-			})?);
+	pub fn build(self, device: &Device)
+	-> Result<GraphicalPass<impl GraphicsPipelineAbstract + Send + Sync, AC>, BuildError> {
+		let render_pass = {
+			let description = GraphicalRenderPassDescription {
+				attachments: self.attachments,
+				depth_attachment: self.depth_attachment,
+			};
+			Arc::new(description.build_render_pass(device.device.clone())?)
+		};
 
 		let pipeline = {
 			let builder = GraphicsPipeline::start()
@@ -271,7 +273,7 @@ where
 			Arc::new(builder.build(device.device.clone())?)
 		};
 		
-		Ok(GraphicalPass { render_pass, pipeline, phantom: std::marker::PhantomData })
+		Ok(GraphicalPass { render_pass, pipeline, })
 	}
 }
 

@@ -116,7 +116,7 @@ fn main() {
 			.build().unwrap());
 
 		let after_frame = device.begin_frame().unwrap()
-			.begin_pass(&albedo_pass, vec![clear_color.into(), 1f32.into()])
+			.begin_pass(&albedo_pass, vec![vulkano::format::ClearValue::None, 1f32.into()])
 				.draw(vec![geometry.clone()], (transform_descriptor_set, light_descriptor_set.clone()), ())
 				.finish_pass()
 			.finish_frame();

@@ -43,7 +43,9 @@ fn main() {
 			.single_buffer_input::<Vertex>()
 			.vertex_shader(vs.main_entry_point(), ())
 			.fragment_shader(fs.main_entry_point(), ())
-			.build_present_pass(&device).unwrap()
+			.add_attachment_swapchain_image(&device, graphics::pass::LoadOp::Clear)
+			.add_attachment_swapchain_depth_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
+			.build(&device).unwrap()
 	};
 
 	let quad = geometry::generate_quad(&device);
@@ -68,12 +70,19 @@ fn main() {
 
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 
-		let after_frame = device.begin_frame().unwrap()
-			.begin_pass(&albedo_pass, vec![clear_color.into(), 1f32.into()])
-				.draw(vec![quad.clone()], ())
-				.draw(vec![cube.clone()], ())
-				.finish_pass()
-			.finish_frame();
+		let frame = device.begin_frame().unwrap();
+
+		let framebuffer = std::sync::Arc::new(albedo_pass.start_framebuffer()
+			.add(frame.get_swapchain_image()).unwrap()
+			.add(frame.get_swapchain_depth()).unwrap()
+			.build().unwrap()
+		);
+
+		let after_frame = frame.begin_pass(&albedo_pass, framebuffer, vec![clear_color.into(), 1f32.into()])
+			.draw(vec![quad.clone()], (), ())
+			.draw(vec![cube.clone()], (), ())
+			.finish_pass()
+		.finish_frame();
 		
 		device = match after_frame {
 			Ok(device) => device,

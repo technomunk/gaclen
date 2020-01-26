@@ -16,12 +16,10 @@
 //! - [Frame] : the device is in the middle of drawing a frame, only [starting a pass](struct.Frame.html#method.begin_pass) and [finishing the frame](struct.Frame.html#method.finish_frame) are available.
 //! - [PassInFrame] : the device is in the middle of drawing a frame with a specific setup ([GraphicalPass]). Only the [drawing](struct.PassInFrame.html#method.draw) and [finishing the pass](struct.PassInFrame.html#method.finish_pass) are available.
 
-use vulkano::framebuffer::AttachmentsList;
-use vulkano::image::ImageViewAccess;
 use crate::window::Window;
 use super::context::Context;
 use super::ResizeError;
-use super::pass::{GraphicalPass, AttachmentCollection, AttachmentType};
+use super::pass::GraphicalPass;
 
 use std::sync::Arc;
 
@@ -30,7 +28,7 @@ use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, 
 use vulkano::descriptor::descriptor_set::DescriptorSetsCollection;
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
 use vulkano::format::{AcceptsPixels, Format, FormatDesc};
-use vulkano::framebuffer::{AttachmentDescription, Framebuffer, FramebufferBuilder, RenderPassAbstract};
+use vulkano::framebuffer::FramebufferAbstract;
 use vulkano::image::{AttachmentImage, ImageCreationError, SwapchainImage};
 use vulkano::pipeline::input_assembly::Index;
 use vulkano::pipeline::viewport::Viewport;
@@ -78,9 +76,9 @@ pub struct Frame {
 }
 
 /// A device that is in the middle of a draw-pass in a middle of drawing a frame.
-pub struct PassInFrame<'a, P, AC> {
+pub struct PassInFrame<'a, P : ?Sized> {
 	frame: Frame,
-	pass: &'a GraphicalPass<P, AC>,
+	pass: &'a GraphicalPass<P>,
 }
 
 /// Error during device creation.
@@ -115,12 +113,22 @@ pub enum FrameFinishError {
 	Commands(CommandBufferExecError),
 }
 
+/// Error during [Framebuffer] creation.
+pub enum FramebufferCreationError {
+
+}
+
 // General
 impl Device {
-	// TODO: add create() function with all parameters and use with_* for setting individual non-default parameters and new() with all default parameters.
-
-	/// Create a new device with default parameters.
-	pub fn new(context: &Context, window: Arc<Window>, present_mode: PresentMode) -> Result<Device, DeviceCreationError> {
+	// TODO: make public once Device is less volatile.
+	/// Create a new Device.
+	fn create(
+		context: &Context,
+		window: Arc<Window>,
+		present_mode: PresentMode,
+		swapchain_depth_format: Format,
+	) -> Result<Device, DeviceCreationError>
+	{
 		let physical = select_physical_device(context)?;
 
 		let device_extensions = DeviceExtensions { khr_swapchain: true, .. DeviceExtensions::none() };
@@ -134,8 +142,6 @@ impl Device {
 		};
 		let surface = vulkano_win::create_vk_surface(window, context.instance.clone())?;
 		let (swapchain, swapchain_images) = create_swapchain(physical, logical.clone(), surface, dimensions, &graphics_queue, present_mode)?;
-
-		let swapchain_depth_format = Format::D16Unorm;
 
 		let swapchain_depths = {
 			let image_count = swapchain_images.len();
@@ -165,6 +171,16 @@ impl Device {
 		resize_dynamic_state_viewport(&mut device.dynamic_state, dimensions, false);
 
 		Ok(device)
+	}
+
+	/// Create a new device with default parameters.
+	pub fn new(context: &Context, window: Arc<Window>, present_mode: PresentMode) -> Result<Device, DeviceCreationError> {
+		Device::create(context, window, present_mode, Format::D16Unorm)
+	}
+
+	/// Create a new device with specified swapchain depth format.
+	pub fn with_depth_format(context: &Context, window: Arc<Window>, present_mode: PresentMode, depth_format: Format) -> Result<Device, DeviceCreationError> {
+		Device::create(context, window, present_mode, depth_format)
 	}
 
 	/// Set the depth buffer to use forward (inverse == false) or inverse range.
@@ -431,17 +447,18 @@ impl Frame {
 	/// 
 	/// - Panics if fails to create the [framebuffer](https://vulkan.lunarg.com/doc/view/1.0.26.0/linux/vkspec.chunked/ch07s03.html) structure for the pass.
 	/// - Panics if fails to begin the [renderpass](https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch07.html) command.
-	pub fn begin_pass<'a, P, AC: AttachmentCollection>(
+	pub fn begin_pass<'a, P : ?Sized, F>(
 		mut self,
-		pass: &'a GraphicalPass<P, AC>,
+		pass: &'a GraphicalPass<P>,
+		framebuffer: F,
 		clear_values: Vec<vulkano::format::ClearValue>)
-	-> PassInFrame<'a, P, AC>
+	-> PassInFrame<'a, P>
+	where
+		F : FramebufferAbstract + Send + Sync + Clone + 'static,
 	{
-		let framebuffer = {
-			let builder = Framebuffer::start(pass.render_pass.clone());
-			self.append_resources(builder, pass.render_pass.desc()).build().unwrap()
-		};
-		self.commands = self.commands.begin_render_pass(Arc::new(framebuffer), false, clear_values).unwrap();
+		// TODO: build framebuffer automatically, using GraphicalRenderPassDescriptor information
+
+		self.commands = self.commands.begin_render_pass(framebuffer, false, clear_values).unwrap();
 
 		PassInFrame {
 			frame: self,
@@ -475,44 +492,24 @@ impl Frame {
 		Ok(device)
 	}
 
+	// Get the color image used for this frame.
+	//
+	// This frame will be presented after [Frame::finish_frame] is called.
 	#[inline]
-	fn append_resources<RP, A>(
-		&self,
-		builder: FramebufferBuilder<RP, A>,
-		attachments: (AttachmentType, AttachmentDescription)
-	) -> FramebufferBuilder<RP, (A, Arc<dyn ImageViewAccess + Send + Sync>)>
-	where
-		RP : RenderPassAbstract,
-		A : AttachmentsList,
-	{
-		match attachments.0 {
-			AttachmentType::SwapchainColor => builder.add(self.device.swapchain_images[self.image_index].clone() as _).unwrap(),
-			AttachmentType::SwapchainDepth => builder.add(self.device.swapchain_depths[self.image_index].clone() as _).unwrap(),
-			AttachmentType::General => panic!("Unimplemented!"),
-		}
+	pub fn get_swapchain_image(&self) -> Arc<SwapchainImage<Arc<Window>>> {
+		self.device.swapchain_images[self.image_index].clone()
 	}
+
+	/// Get the depth image used for this frame.
 	#[inline]
-	fn append_resources<RP, A>(
-		&self,
-		builder: FramebufferBuilder<RP, A>,
-		attachments: (impl AttachmentCollection, (AttachmentType, AttachmentDescription))
-	) -> FramebufferBuilder<RP, (A, Arc<dyn ImageViewAccess + Send + Sync>)>
-	where
-		RP : RenderPassAbstract,
-		A : AttachmentsList,
-	{
-		let builder = match attachments.1 .0 {
-			AttachmentType::SwapchainColor => builder.add(self.device.swapchain_images[self.image_index].clone() as _).unwrap(),
-			AttachmentType::SwapchainDepth => builder.add(self.device.swapchain_depths[self.image_index].clone() as _).unwrap(),
-			AttachmentType::General => panic!("Unimplemented!"),
-		};
-		self.append_resources::<RP, _>(builder, attachments.0)
+	pub fn get_swapchain_depth(&self) -> Arc<AttachmentImage> {
+		self.device.swapchain_depths[self.image_index].clone()
 	}
 }
 
 impl<'a, P> PassInFrame<'a, P>
 where
-	P : GraphicsPipelineAbstract + Send + Sync + 'static,
+	P : GraphicsPipelineAbstract + Send + Sync + ?Sized + 'static,
 {
 	// TODO: non-polymorphic vertex_buffer drawing
 
@@ -805,8 +802,4 @@ fn write_queue_details(fmt: &mut std::fmt::Formatter, queue: &DeviceQueue, prefi
 	writeln!(fmt, "{}transfer: {}", prefix, family.explicitly_supports_transfers())?;
 	writeln!(fmt, "{}compute: {}", prefix, family.supports_compute())?;
 	Ok(())
-}
-
-fn build_framebuffer<RP>(builder: FramebufferBuilder<RP, ()>, attachments: impl AttachmentCollection) -> Framebuffer<_> {
-
 }

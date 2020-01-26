@@ -4,18 +4,20 @@ use vulkano::pipeline::shader::{SpecializationConstants, GraphicsEntryPointAbstr
 use vulkano::pipeline::raster::{CullMode, FrontFace, PolygonMode, Rasterization};
 use vulkano::pipeline::vertex::{SingleBufferDefinition, VertexDefinition};
 use vulkano::framebuffer::{AttachmentDescription, RenderPassDesc, RenderPassCreationError, Subpass};
+use vulkano::image::ImageLayout;
 
 use crate::graphics;
 use graphics::device::Device;
 use graphics::pass::graphical_pass;
-use graphical_pass::{AttachmentCollection, AttachmentType, GraphicalPass, GraphicalRenderPassDescription};
+use graphical_pass::{AttachmentType, GraphicalPass, GraphicalRenderPassDescription};
 
 use std::sync::Arc;
 
 pub use vulkano::pipeline::input_assembly::PrimitiveTopology;
+pub use vulkano::framebuffer::{StoreOp, LoadOp};
 
 /// A structure for initializing [GraphicalPasses](struct.GraphicalPass).
-pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
+pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	vertex_input: VI,
 	vertex_shader: (VS, VSS),
 	primitive_topology: PrimitiveTopology,
@@ -23,17 +25,32 @@ pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
 	fragment_shader: (FS, FSS),
 	depth_stencil: DepthStencil,
 
-	attachments: AC,
+	samples: u32,
+	attachments: Vec<(AttachmentType, AttachmentDescription)>,
 	depth_attachment: Option<usize>,
 }
 
+/// Error during GraphicalPassBuilder setup.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BuildError {
-	RenderPassCreation(RenderPassCreationError),
-	GraphicsPipelineCreation(GraphicsPipelineCreationError),
+pub enum BuilderError {
+	/// A depth attachment already exists while trying to add one.
+	/// 
+	/// Contains the index of existing attachment.
+	DepthAttachmentAlreadyExists(usize),
 }
 
-impl GraphicalPassBuilder<(), (), (), (), (), ()> {
+/// Error during GraphicalPassBuilder::build.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuildError {
+	/// Error during creation of a [RenderPass].
+	RenderPassCreation(RenderPassCreationError),
+	/// Error during creation of a [GraphicsPipeline].
+	GraphicsPipelineCreation(GraphicsPipelineCreationError),
+	/// No attachments were added to the pass, therefore no invocation is possible!
+	NoAttachments,
+}
+
+impl GraphicalPassBuilder<(), (), (), (), ()> {
 	pub(super) fn new() -> Self {
 		Self {
 			vertex_input: (),
@@ -43,15 +60,16 @@ impl GraphicalPassBuilder<(), (), (), (), (), ()> {
 			fragment_shader: ((), ()),
 			depth_stencil: DepthStencil::default(),
 
-			attachments: (),
+			samples: 1,
+			attachments: Vec::default(),
 			depth_attachment: None,
 		}
 	}
 }
 
-impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
+impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// Use provided vertex input type.
-	pub fn vertex_input<T>(self, vertex_input: T) -> GraphicalPassBuilder<T, VS, VSS, FS, FSS, AC> {
+	pub fn vertex_input<T>(self, vertex_input: T) -> GraphicalPassBuilder<T, VS, VSS, FS, FSS> {
 		GraphicalPassBuilder {
 			vertex_input: vertex_input,
 			vertex_shader: self.vertex_shader,
@@ -60,13 +78,14 @@ impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
 			fragment_shader: self.fragment_shader,
 			depth_stencil: self.depth_stencil,
 
+			samples: self.samples,
 			attachments: self.attachments,
 			depth_attachment: self.depth_attachment,
 		}
 	}
 
 	/// Use a single buffer of provided vertex type as input.
-	pub fn single_buffer_input<V>(self) -> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VSS, FS, FSS, AC> { self.vertex_input(SingleBufferDefinition::<V>::new()) }
+	pub fn single_buffer_input<V>(self) -> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VSS, FS, FSS> { self.vertex_input(SingleBufferDefinition::<V>::new()) }
 
 	/// Use given [PrimitiveTopology].
 	/// 
@@ -175,7 +194,7 @@ impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
 
 	/// Use given vertex shader with given specialization constants.
 	pub fn vertex_shader<S, SC>(self, shader: S, specialization: SC)
-	-> GraphicalPassBuilder<VI, S, SC, FS, FSS, AC> 
+	-> GraphicalPassBuilder<VI, S, SC, FS, FSS> 
 	where
 		S : GraphicsEntryPointAbstract<SpecializationConstants = SC>,
 		SC : SpecializationConstants,
@@ -188,6 +207,7 @@ impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
 			fragment_shader: self.fragment_shader,
 			depth_stencil: self.depth_stencil,
 
+			samples: self.samples,
 			attachments: self.attachments,
 			depth_attachment: self.depth_attachment,
 		}
@@ -195,7 +215,7 @@ impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
 
 	/// Use given fragment shader with given specialization constants.
 	pub fn fragment_shader<S, SC>(self, shader: S, specialization: SC)
-	-> GraphicalPassBuilder<VI, VS, VSS, S, SC, AC>
+	-> GraphicalPassBuilder<VI, VS, VSS, S, SC>
 	where
 		S : GraphicsEntryPointAbstract<SpecializationConstants = SC>,
 		SC : SpecializationConstants,
@@ -208,13 +228,68 @@ impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC> {
 			fragment_shader: (shader, specialization),
 			depth_stencil: self.depth_stencil,
 
+			samples: self.samples,
 			attachments: self.attachments,
 			depth_attachment: self.depth_attachment,
 		}
 	}
+
+	/// Append an image attachment (resource that is drawn to) to this pass.
+	/// 
+	/// In particular set up the pass to use swapchain image (frame result).
+	pub fn add_attachment_swapchain_image(mut self, device: &Device, load: LoadOp) -> Self {
+		self.attachments.push((AttachmentType::SwapchainImage, AttachmentDescription{
+			format: device.swapchain.format(),
+			samples: self.samples,
+			load,
+			store: StoreOp::Store,
+			stencil_load: LoadOp::DontCare,
+			stencil_store: StoreOp::DontCare,
+			initial_layout: ImageLayout::ColorAttachmentOptimal,
+			final_layout: ImageLayout::ColorAttachmentOptimal,
+		}));
+		self
+	}
+
+	/// Append an image attachment (resource that is drawn to) to this pass.
+	/// 
+	/// In particular set up the pass to use swapchain depth (z-buffer).
+	pub fn add_attachment_swapchain_depth(mut self, device: &Device, load: LoadOp, store: StoreOp) -> Result<Self, BuilderError> {
+		match self.depth_attachment {
+			Some(index) => Err(BuilderError::DepthAttachmentAlreadyExists(index)),
+			None => {
+				self.depth_attachment = Some(self.attachments.len());
+				self.attachments.push((AttachmentType::SwapchainImage, AttachmentDescription{
+					format: device.swapchain_depth_format,
+					samples: self.samples,
+					load: load,
+					store: store,
+					stencil_load: load,
+					stencil_store: store,
+					initial_layout: ImageLayout::DepthStencilAttachmentOptimal,
+					final_layout: ImageLayout::DepthStencilAttachmentOptimal,
+				}));
+				Ok(self)
+			}
+		}
+	}
+	/// Append an image attachment (resource that is drawn to) to this pass, preserving its contents after the pass.
+	/// 
+	/// In particular set up the pass to use swapchain depth (z-buffer).
+	pub fn add_attachment_swapchain_depth_preserve(self, device: &Device, load: LoadOp) -> Result<Self, BuilderError> {
+		self.add_attachment_swapchain_depth(device, load, StoreOp::Store)
+	}
+	/// Append an image attachment (resource that is drawn to) to this pass, discarding its contents after the pass.
+	/// 
+	/// In particular set up the pass to use swapchain depth (z-buffer).
+	pub fn add_attachment_swapchain_depth_discard(self, device: &Device, load: LoadOp) -> Result<Self, BuilderError> {
+		self.add_attachment_swapchain_depth(device, load, StoreOp::DontCare)
+	}
+
+	// TODO: add general attachments
 }
 
-impl<VI, VS, VSS, FS, FSS, AC> GraphicalPassBuilder<VI, VS, VSS, FS, FSS, AC>
+impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS>
 where
 	VS : GraphicsEntryPointAbstract<SpecializationConstants=VSS>,
 	FS : GraphicsEntryPointAbstract<SpecializationConstants=FSS>,
@@ -223,10 +298,13 @@ where
 	VS::PipelineLayout : Send + Sync + Clone + 'static,
 	FS::PipelineLayout : Send + Sync + Clone + 'static,
 	VI : VertexDefinition<VS::InputDefinition> + Send + Sync + 'static,
-	AC : AttachmentCollection + Send + Sync,
 {
 	pub fn build(self, device: &Device)
-	-> Result<GraphicalPass<impl GraphicsPipelineAbstract + Send + Sync, AC>, BuildError> {
+	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync>, BuildError> {
+		if self.attachments.is_empty() {
+			return Err(BuildError::NoAttachments)
+		};
+
 		let render_pass = {
 			let description = GraphicalRenderPassDescription {
 				attachments: self.attachments,

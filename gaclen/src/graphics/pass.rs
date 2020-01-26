@@ -4,4 +4,4 @@ mod graphical_pass;
 mod builder;
 
 pub use graphical_pass::*;
-pub use builder::GraphicalPassBuilder;
+pub use builder::{GraphicalPassBuilder, PrimitiveTopology, StoreOp, LoadOp};

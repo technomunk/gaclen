@@ -48,7 +48,9 @@ fn main() {
 			.single_buffer_input::<Vertex>()
 			.vertex_shader(vs.main_entry_point(), ())
 			.fragment_shader(fs.main_entry_point(), ())
-			.build_present_pass(&device).unwrap()
+			.add_attachment_swapchain_image(&device, graphics::pass::LoadOp::Clear)
+			.add_attachment_swapchain_depth_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
+			.build(&device).unwrap()
 	};
 
 	let triangle_buffer = device.create_cpu_accessible_buffer([
@@ -81,11 +83,17 @@ fn main() {
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f32(), window.get_inner_size().unwrap().into());
 
-		let after_frame = device.begin_frame().unwrap()
-			.begin_pass(&pass, vec![clear_color.into(), gaclen::graphics::vulkano::format::ClearValue::Depth(1.0)])
-				.draw(vec![triangle_buffer.clone()], (), push_constants)
-				.finish_pass()
-			.finish_frame();
+		let frame = device.begin_frame().unwrap();
+
+		let framebuffer = std::sync::Arc::new(pass.start_framebuffer()
+			.add(frame.get_swapchain_image()).unwrap()
+			.add(frame.get_swapchain_depth()).unwrap()
+			.build().unwrap()
+		);
+
+		let after_frame = frame.begin_pass(&pass, framebuffer, vec![clear_color.into(), 1.0f32.into()])
+			.draw(vec![triangle_buffer.clone()], (), push_constants)
+			.finish_pass().finish_frame();
 		
 		device = match after_frame {
 			Ok(device) => device,

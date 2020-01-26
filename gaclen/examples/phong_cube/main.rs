@@ -48,7 +48,9 @@ fn main() {
 			.basic_depth_test()
 			.front_face_clockwise()
 			.cull_back()
-			.build_present_pass(&device).unwrap()
+			.add_attachment_swapchain_image(&device, graphics::pass::LoadOp::Clear)
+			.add_attachment_swapchain_depth_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
+			.build(&device).unwrap()
 	};
 
 	let geometry = geometry::generate_cube(&device).unwrap();
@@ -115,11 +117,18 @@ fn main() {
 			.add_buffer(transform).unwrap()
 			.build().unwrap());
 
-		let after_frame = device.begin_frame().unwrap()
-			.begin_pass(&albedo_pass, vec![clear_color.into(), 1f32.into()])
-				.draw(vec![geometry.clone()], (transform_descriptor_set, light_descriptor_set.clone()), ())
-				.finish_pass()
-			.finish_frame();
+		let frame = device.begin_frame().unwrap();
+
+		let framebuffer = std::sync::Arc::new(albedo_pass.start_framebuffer()
+			.add(frame.get_swapchain_image()).unwrap()
+			.add(frame.get_swapchain_depth()).unwrap()
+			.build().unwrap()
+		);
+
+		let after_frame = frame.begin_pass(&albedo_pass, framebuffer, vec![clear_color.into(), 1f32.into()])
+			.draw(vec![geometry.clone()], (transform_descriptor_set, light_descriptor_set.clone()), ())
+			.finish_pass()
+		.finish_frame();
 		
 		device = match after_frame {
 			Ok(device) => device,

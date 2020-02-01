@@ -1,15 +1,22 @@
 # Changelog
 
+## 0.0.10
+
+- **!IMPORTANT!** adds initial support for generic attachments
+- **!BREAKING CHANGE!** refactors attachments in `GraphicalPass` creation:
+  - `add_attachment_*()` are now broken into separate `add_image_attachment()` and `add_depth_attachment()`
+  - swapchain is now just a special case of the above method call
+
 ## 0.0.9 Unclear Passes
 
-- **!IMPORTANT!** refactors `GraphicalPass`:
-  - gets rid of 2 generic parameters (descriptor and present-pass markers)
-  - forces the user to create framebuffers
 - **!IMPORTANT!** adds `GraphicalPassBuilder::add_attachment*()` functionality
   - allows to set user-defined load and store operators
   - unify workflow for using swapchain and user-declared image resources
-- **!IMPORTANT CHANGE!** `GraphicalPassBuilder::build_present_pass()` is now just `GraphicalPassBuilder::build()`
-- **!IMPORTANT CHANGE!** `Frame::begin_pass()` now takes a framebuffer argument
+- **!BREAKING CHANGE!** refactors `GraphicalPass`:
+  - gets rid of 2 generic parameters (descriptor and present-pass markers)
+  - forces the user to create framebuffers
+- **!BREAKING CHANGE!** `GraphicalPassBuilder::build_present_pass()` is now just `GraphicalPassBuilder::build()`
+- **!BREAKING CHANGE!** `Frame::begin_pass()` now takes a framebuffer argument
 - adds `GraphicalPass::begin_framebuffer()` method to start building a framebuffer *(see examples for help)*
 - adds `Frame::get_swapchain_image()` and `Frame::get_swapchain_depth()` accessors to current images for building framebuffers
 - adds `Device::with_depth_format()` constructor for specifying custom swapchain depth format

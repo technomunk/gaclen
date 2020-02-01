@@ -48,8 +48,8 @@ fn main() {
 			.basic_depth_test()
 			.front_face_clockwise()
 			.cull_back()
-			.add_attachment_swapchain_image(&device, graphics::pass::LoadOp::Clear)
-			.add_attachment_swapchain_depth_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
+			.add_image_attachment_swapchain_cleared(&device)
+			.add_depth_attachment_swapchain_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
 			.build(&device).unwrap()
 	};
 

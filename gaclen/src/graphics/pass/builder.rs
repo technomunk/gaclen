@@ -1,3 +1,4 @@
+use vulkano::format::{Format, PossibleDepthFormatDesc};
 use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineAbstract, GraphicsPipelineCreationError};
 use vulkano::pipeline::depth_stencil::{Compare, DepthStencil};
 use vulkano::pipeline::shader::{SpecializationConstants, GraphicsEntryPointAbstract};
@@ -9,7 +10,7 @@ use vulkano::image::ImageLayout;
 use crate::graphics;
 use graphics::device::Device;
 use graphics::pass::graphical_pass;
-use graphical_pass::{AttachmentType, GraphicalPass, GraphicalRenderPassDescription};
+use graphical_pass::{GraphicalPass, GraphicalRenderPassDescription};
 
 use std::sync::Arc;
 
@@ -26,13 +27,15 @@ pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	depth_stencil: DepthStencil,
 
 	samples: u32,
-	attachments: Vec<(AttachmentType, AttachmentDescription)>,
+	attachments: Vec<AttachmentDescription>,
 	depth_attachment: Option<usize>,
 }
 
 /// Error during GraphicalPassBuilder setup.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BuilderError {
+pub enum AttachmentError {
+	/// The format supplied cannot be used for requested purposes.
+	InvalidFormat,
 	/// A depth attachment already exists while trying to add one.
 	/// 
 	/// Contains the index of existing attachment.
@@ -235,58 +238,82 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	}
 
 	/// Append an image attachment (resource that is drawn to) to this pass.
-	/// 
-	/// In particular set up the pass to use swapchain image (frame result).
-	pub fn add_attachment_swapchain_image(mut self, device: &Device, load: LoadOp) -> Self {
-		self.attachments.push((AttachmentType::SwapchainImage, AttachmentDescription{
-			format: device.swapchain.format(),
+	pub fn add_image_attachment(mut self, format: Format, load: LoadOp, store: StoreOp) -> Self {
+		self.attachments.push(AttachmentDescription{
+			format,
 			samples: self.samples,
 			load,
-			store: StoreOp::Store,
+			store,
 			stencil_load: LoadOp::DontCare,
 			stencil_store: StoreOp::DontCare,
 			initial_layout: ImageLayout::ColorAttachmentOptimal,
 			final_layout: ImageLayout::ColorAttachmentOptimal,
-		}));
+		});
 		self
 	}
 
 	/// Append an image attachment (resource that is drawn to) to this pass.
 	/// 
-	/// In particular set up the pass to use swapchain depth (z-buffer).
-	pub fn add_attachment_swapchain_depth(mut self, device: &Device, load: LoadOp, store: StoreOp) -> Result<Self, BuilderError> {
-		match self.depth_attachment {
-			Some(index) => Err(BuilderError::DepthAttachmentAlreadyExists(index)),
-			None => {
-				self.depth_attachment = Some(self.attachments.len());
-				self.attachments.push((AttachmentType::SwapchainImage, AttachmentDescription{
-					format: device.swapchain_depth_format,
-					samples: self.samples,
-					load: load,
-					store: store,
-					stencil_load: load,
-					stencil_store: store,
-					initial_layout: ImageLayout::DepthStencilAttachmentOptimal,
-					final_layout: ImageLayout::DepthStencilAttachmentOptimal,
-				}));
-				Ok(self)
-			}
-		}
-	}
-	/// Append an image attachment (resource that is drawn to) to this pass, preserving its contents after the pass.
-	/// 
-	/// In particular set up the pass to use swapchain depth (z-buffer).
-	pub fn add_attachment_swapchain_depth_preserve(self, device: &Device, load: LoadOp) -> Result<Self, BuilderError> {
-		self.add_attachment_swapchain_depth(device, load, StoreOp::Store)
-	}
-	/// Append an image attachment (resource that is drawn to) to this pass, discarding its contents after the pass.
-	/// 
-	/// In particular set up the pass to use swapchain depth (z-buffer).
-	pub fn add_attachment_swapchain_depth_discard(self, device: &Device, load: LoadOp) -> Result<Self, BuilderError> {
-		self.add_attachment_swapchain_depth(device, load, StoreOp::DontCare)
+	/// In particular set up the pass to use swapchain image (frame result) of a device.
+	pub fn add_image_attachment_swapchain(self, device: &Device, load: LoadOp) -> Self {
+		self.add_image_attachment(device.swapchain.format(), load, StoreOp::Store)
 	}
 
-	// TODO: add general attachments
+	/// Append an image attachment (resource that is drawn to) to this pass.
+	/// 
+	/// Shorthand for supplying LoadOp::Clear to add_image_attachment_swapchain.
+	pub fn add_image_attachment_swapchain_cleared(self, device: &Device) -> Self {
+		self.add_image_attachment_swapchain(device, LoadOp::Clear)
+	}
+
+	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
+	/// 
+	/// May fail if a depth attachment was already appended (currently only 1 is supported at a time).
+	pub fn add_depth_attachment(mut self, format: Format, load: LoadOp, store: StoreOp) -> Result<Self, AttachmentError> {
+		if format.is_depth() {
+			match self.depth_attachment {
+				Some(index) => Err(AttachmentError::DepthAttachmentAlreadyExists(index)),
+				None => {
+					self.depth_attachment = Some(self.attachments.len());
+					self.attachments.push(AttachmentDescription{
+						format: format,
+						samples: self.samples,
+						load: load,
+						store: store,
+						stencil_load: load,
+						stencil_store: store,
+						initial_layout: ImageLayout::DepthStencilAttachmentOptimal,
+						final_layout: ImageLayout::DepthStencilAttachmentOptimal,
+					});
+					Ok(self)
+				}
+			}
+		} else {
+			Err(AttachmentError::InvalidFormat)
+		}
+	}
+
+	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
+	/// 
+	/// May fail if a depth attachment was already appended (currently only 1 is supported at a time).
+	/// In particular set up the pass to use swapchain depth of a device.
+	pub fn add_depth_attachment_swapchain(self, device: &Device, load: LoadOp, store: StoreOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment(device.swapchain_depth_format, load, store)
+	}
+
+	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
+	/// 
+	/// Shorthand for supplying StoreOp::DontCare as store parameter to add_depth_attachment_swapchain.
+	pub fn add_depth_attachment_swapchain_discard(self, device: &Device, load: LoadOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment_swapchain(device, load, StoreOp::DontCare)
+	}
+
+	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
+	/// 
+	/// Shorthand for supplying StoreOp::Store as store parameter to add_depth_attachment_swapchain.
+	pub fn add_depth_attachment_swapchain_preserve(self, device: &Device, load: LoadOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment_swapchain(device, load, StoreOp::Store)
+	}
 }
 
 impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS>

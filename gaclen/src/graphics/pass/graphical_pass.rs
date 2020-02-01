@@ -39,17 +39,12 @@ where
 	}
 }
 
+#[derive(Debug, Clone)]
 pub struct GraphicalRenderPassDescription {
 	/// Image attachments of the render pass.
-	pub attachments: Vec<(AttachmentType, AttachmentDescription)>,
+	pub attachments: Vec<AttachmentDescription>,
 	/// Depth stencil attachment index.
 	pub depth_attachment: Option<usize>,
-}
-
-pub enum AttachmentType {
-	SwapchainImage,
-	SwapchainDepth,
-	General,
 }
 
 unsafe impl RenderPassDesc for GraphicalRenderPassDescription {
@@ -59,7 +54,7 @@ unsafe impl RenderPassDesc for GraphicalRenderPassDescription {
 	#[inline]
 	fn attachment_desc(&self, num: usize) -> Option<AttachmentDescription> {
 		match num < self.attachments.len() {
-			true => Some(self.attachments[num].1.clone()),
+			true => Some(self.attachments[num].clone()),
 			false => None,
 		}
 	}

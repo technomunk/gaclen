@@ -6,7 +6,9 @@
 
 pub mod context;
 pub mod device;
+pub mod frame;
 pub mod pass;
+pub mod swapchain;
 
 /// used for hardware acceleration.
 pub use vulkano;

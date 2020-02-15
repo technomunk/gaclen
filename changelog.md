@@ -6,6 +6,9 @@
 - **!BREAKING CHANGE!** refactors attachments in `GraphicalPass` creation:
   - `add_attachment_*()` are now broken into separate `add_image_attachment()` and `add_depth_attachment()`
   - swapchain is now just a special case of the above method call
+- **!BREAKING CHANGE!** refactors `Device`, by moving the functionality into relevant modules:
+  - splits `swapchain::Swapchain` away from device, it now has to be created and used separately
+  - splits `frame::Frame` and `frame::PassInFrame` from the device module
 
 ## 0.0.9 Unclear Passes
 

@@ -9,6 +9,7 @@ use vulkano::image::ImageLayout;
 
 use crate::graphics;
 use graphics::device::Device;
+use graphics::swapchain::Swapchain;
 use graphics::pass::graphical_pass;
 use graphical_pass::{GraphicalPass, GraphicalRenderPassDescription};
 
@@ -255,15 +256,15 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// Append an image attachment (resource that is drawn to) to this pass.
 	/// 
 	/// In particular set up the pass to use swapchain image (frame result) of a device.
-	pub fn add_image_attachment_swapchain(self, device: &Device, load: LoadOp) -> Self {
-		self.add_image_attachment(device.swapchain.format(), load, StoreOp::Store)
+	pub fn add_image_attachment_swapchain(self, swapchain: &Swapchain, load: LoadOp) -> Self {
+		self.add_image_attachment(swapchain.swapchain.format(), load, StoreOp::Store)
 	}
 
 	/// Append an image attachment (resource that is drawn to) to this pass.
 	/// 
 	/// Shorthand for supplying LoadOp::Clear to add_image_attachment_swapchain.
-	pub fn add_image_attachment_swapchain_cleared(self, device: &Device) -> Self {
-		self.add_image_attachment_swapchain(device, LoadOp::Clear)
+	pub fn add_image_attachment_swapchain_cleared(self, swapchain: &Swapchain) -> Self {
+		self.add_image_attachment_swapchain(swapchain, LoadOp::Clear)
 	}
 
 	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
@@ -297,22 +298,22 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// 
 	/// May fail if a depth attachment was already appended (currently only 1 is supported at a time).
 	/// In particular set up the pass to use swapchain depth of a device.
-	pub fn add_depth_attachment_swapchain(self, device: &Device, load: LoadOp, store: StoreOp) -> Result<Self, AttachmentError> {
-		self.add_depth_attachment(device.swapchain_depth_format, load, store)
+	pub fn add_depth_attachment_swapchain(self, swapchain: &Swapchain, load: LoadOp, store: StoreOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment(swapchain.depth_format, load, store)
 	}
 
 	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
 	/// 
 	/// Shorthand for supplying StoreOp::DontCare as store parameter to add_depth_attachment_swapchain.
-	pub fn add_depth_attachment_swapchain_discard(self, device: &Device, load: LoadOp) -> Result<Self, AttachmentError> {
-		self.add_depth_attachment_swapchain(device, load, StoreOp::DontCare)
+	pub fn add_depth_attachment_swapchain_discard(self, swapchain: &Swapchain, load: LoadOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment_swapchain(swapchain, load, StoreOp::DontCare)
 	}
 
 	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
 	/// 
 	/// Shorthand for supplying StoreOp::Store as store parameter to add_depth_attachment_swapchain.
-	pub fn add_depth_attachment_swapchain_preserve(self, device: &Device, load: LoadOp) -> Result<Self, AttachmentError> {
-		self.add_depth_attachment_swapchain(device, load, StoreOp::Store)
+	pub fn add_depth_attachment_swapchain_preserve(self, swapchain: &Swapchain, load: LoadOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment_swapchain(swapchain, load, StoreOp::Store)
 	}
 }
 

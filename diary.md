@@ -42,3 +42,7 @@ Greg improved documentation, learning a bunch of lessons.
 
 Greg introduced changelog and 'expose-underlying-vulkano' feature.
 Since the changelog this diary is reserved for personal entries in free form.
+
+## 16-02-2020
+
+Greg split the `Device` into smaller modules related to the relevant functionality, such as `swapchain` or `buffer`.

@@ -22,15 +22,9 @@ use super::context::Context;
 
 use std::sync::Arc;
 
-use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer, CpuBufferPool, ImmutableBuffer};
 use vulkano::device::{Device as LogicalDevice, DeviceExtensions, Queue as DeviceQueue};
-use vulkano::format::{AcceptsPixels, Format, FormatDesc};
-use vulkano::image::{ImageCreationError};
-use vulkano::sampler::{Filter, Sampler, SamplerCreationError, SamplerAddressMode, MipmapMode};
 use vulkano::instance::PhysicalDevice;
-use vulkano::image::{Dimensions, ImmutableImage};
 use vulkano::sync::{GpuFuture};
-use vulkano::memory::DeviceMemoryAllocError;
 
 pub use vulkano::swapchain::PresentMode;
 
@@ -59,12 +53,6 @@ pub enum DeviceCreationError {
 	Logical(vulkano::device::DeviceCreationError),
 }
 
-/// Error during [Framebuffer] creation.
-pub enum FramebufferCreationError {
-
-}
-
-// General
 impl Device {
 	/// Create a new device using provided driver context.
 	pub fn new(
@@ -92,166 +80,10 @@ impl Device {
 		self.device.physical_device()
 	}
 
-	/// Get the underlying logical device (useful for supplying to own shaders).
+	/// Get the underlying vulkano logical device.
+	/// 
+	/// The result can be useful for creating simple resources that don't require much usage of gaclen's functionality.
 	pub fn logical_device(&self) -> Arc<LogicalDevice> { self.device.clone() }
-}
-
-// Buffers
-impl Device {
-	/// Create a basic buffer for data for processing on the GPU.
-	/// 
-	/// These are useful for quick prototyping, as these are typically placed in shared memory (system based RAM, accessed by GPU through the bus).
-	pub fn create_cpu_accessible_buffer<T: 'static>(&self, data_iterator: impl ExactSizeIterator<Item = T>) -> Result<Arc<CpuAccessibleBuffer<[T]>>, DeviceMemoryAllocError> {
-		CpuAccessibleBuffer::from_iter(self.logical_device(), BufferUsage::all(), data_iterator)
-	}
-
-	/// Create a pool of small CPU-accessible buffers.
-	/// 
-	/// These are particularly useful for regularly changing data, such as object uniforms.
-	pub fn create_cpu_buffer_pool<T: 'static>(&self, usage: BufferUsage) -> CpuBufferPool<T> {
-		CpuBufferPool::<T>::new(self.logical_device(), usage)
-	}
-
-	/// Create a device-local immutable buffer from some data.
-	/// 
-	/// Builds an intermediate memory-mapped buffer, writes data to it, builds a copy (upload) command buffer and executes it.
-	/// 
-	/// # Panic.
-	/// 
-	/// - Panics if fails to submit the copy command buffer.
-	pub fn create_immutable_buffer_from_data<T>(&self, data: T, usage: BufferUsage) -> Result<Arc<ImmutableBuffer<T>>, DeviceMemoryAllocError>
-	where
-		T : Send + Sync + Sized + 'static,
-	{
-		let (buffer, future) = ImmutableBuffer::from_data(data, usage, self.transfer_queue.clone())?;
-
-		// TODO: handle synchronization between separate queues in a performant way
-		future.flush().unwrap();
-
-		Ok(buffer)
-	}
-
-	/// Create a device-local immutable buffer from some data iterator.
-	/// 
-	/// Builds an intermediate memory-mapped buffer, writes data to it, builds a copy (upload) command buffer and executes it.
-	/// 
-	/// # Panic.
-	/// 
-	/// - Panics if fails to submit the copy command buffer.
-	pub fn create_immutable_buffer_from_iter<T>(&self, data_iterator: impl ExactSizeIterator<Item = T>, usage: BufferUsage) -> Result<Arc<ImmutableBuffer<[T]>>, DeviceMemoryAllocError>
-	where
-		T : Send + Sync + Sized + 'static,
-	{
-		let (buffer, future) = ImmutableBuffer::from_iter(data_iterator, usage, self.transfer_queue.clone())?;
-
-		// TODO: handle synchronization between separate queues in a performant way
-		future.flush().unwrap();
-
-		Ok(buffer)
-	}
-
-	// TODO: add more ways to create buffers
-}
-
-// Images
-impl Device {
-	/// Create an [ImmutableImage] from a data iterator.
-	/// 
-	/// Builds an intermediate memory-mapped buffer, writes data to it, builds a copy (upload) command buffer and executes it.
-	/// 
-	/// # Panic.
-	/// 
-	/// - Panics if fails to submit the copy command buffer.
-	pub fn create_immutable_image_from_iter<P, I, F>(&self, data_iterator: I, dimensions: Dimensions, format: F)
-	-> Result<Arc<ImmutableImage<F>>, ImageCreationError>
-	where
-		P : Send + Sync + Clone + 'static,
-		F : FormatDesc + AcceptsPixels<P> + Send + Sync + 'static,
-		I : ExactSizeIterator<Item = P>,
-		Format: AcceptsPixels<P>,
-	{
-		let (image, future) = ImmutableImage::from_iter(data_iterator, dimensions, format, self.transfer_queue.clone())?;
-
-		// TODO: handle synchronization between separate queues in a performant way
-		future.flush().unwrap();
-
-		// let time: Box<dyn GpuFuture> = match self.before_frame.take() {
-		// 	Some(time) => Box::new(time.join(future)),
-		// 	None => Box::new(future),
-		// };
-		// self.before_frame = Some(time);
-
-		Ok(image)
-	}
-
-	/// Creates a new [Sampler] (image viewer) with the given behavior.
-    ///
-    /// `magnifying_filter` and `minifying_filter` define how the implementation should sample from the image
-    /// when it is respectively larger and smaller than the original.
-    ///
-    /// `mipmap_mode` defines how the implementation should choose which mipmap to use.
-    ///
-    /// `address_u`, `address_v` and `address_w` define how the implementation should behave when
-    /// sampling outside of the texture coordinates range `[0.0, 1.0]`.
-    ///
-    /// `mip_lod_bias` is a value to add to .
-    ///
-    /// `max_anisotropy` must be greater than or equal to 1.0. If greater than 1.0, the
-    /// implementation will use anisotropic filtering. Using a value greater than 1.0 requires
-    /// the `sampler_anisotropy` feature to be enabled when creating the device.
-    ///
-    /// `min_lod` and `max_lod` are respectively the minimum and maximum mipmap level to use.
-    /// `max_lod` must always be greater than or equal to `min_lod`.
-    ///
-    /// # Panic
-    ///
-    /// - Panics if multiple `ClampToBorder` values are passed and the border color is different.
-    /// - Panics if `max_anisotropy < 1.0`.
-    /// - Panics if `min_lod > max_lod`.
-	pub fn create_sampler(
-		&self,
-		magnifying_filter: Filter,
-		minifying_filter: Filter,
-		mipmap_mode: MipmapMode,
-		address_u: SamplerAddressMode,
-		address_v: SamplerAddressMode,
-		address_w: SamplerAddressMode,
-		mip_lod_bias: f32,
-		max_anisotropy: f32,
-		min_lod: f32,
-		max_lod: f32
-	) -> Result<Arc<Sampler>, SamplerCreationError> {
-		Sampler::new(
-			self.device.clone(),
-			magnifying_filter,
-			minifying_filter,
-			mipmap_mode,
-			address_u,
-			address_v,
-			address_w,
-			mip_lod_bias,
-			max_anisotropy,
-			min_lod,
-			max_lod
-		)
-	}
-
-	/// Shortcut for creating a simple sampler with default settings that is useful for prototyping.
-	pub fn create_simple_linear_repeat_sampler(&self) -> Result<Arc<Sampler>, SamplerCreationError>
-	{
-		self.create_sampler(
-			Filter::Linear,
-			Filter::Linear,
-			MipmapMode::Linear,
-			SamplerAddressMode::Repeat,
-			SamplerAddressMode::Repeat,
-			SamplerAddressMode::Repeat,
-			0.0,
-			1.0,
-			0.0,
-			1_000.0
-		)
-	}
 }
 
 // Member exposure

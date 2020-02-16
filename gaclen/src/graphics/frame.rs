@@ -12,7 +12,6 @@ use vulkano::buffer::{BufferAccess, TypedBufferAccess};
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
 use vulkano::descriptor::descriptor_set::DescriptorSetsCollection;
 use vulkano::framebuffer::FramebufferAbstract;
-use vulkano::image::{AttachmentImage, SwapchainImage};
 use vulkano::sync::{GpuFuture, FlushError};
 use vulkano::swapchain::{Swapchain as VlkSwapchain};
 use vulkano::pipeline::GraphicsPipelineAbstract;
@@ -21,18 +20,19 @@ use vulkano::pipeline::vertex::VertexSource;
 
 /// A frame in the process of being drawn.
 pub struct Frame {
-	device: Device,
-	swapchain: Arc<VlkSwapchain<Arc<Window>>>,
-	time: Box<dyn GpuFuture>,
-	dynamic_state: DynamicState,
-	commands: AutoCommandBufferBuilder,
-	image_index: usize,
+	pub(super) device: Device,
+	pub(super) swapchain: Arc<VlkSwapchain<Arc<Window>>>,
+	pub(super) time: Box<dyn GpuFuture>,
+	pub(super) dynamic_state: DynamicState,
+	pub(super) commands: AutoCommandBufferBuilder,
+	// index of the frame in the swapchain
+	pub(super) swapchain_index: usize,
 }
 
 /// A frame in the process of being drawn using a given [GraphicalPass].
 pub struct PassInFrame<'a, P : ?Sized> {
-	frame: Frame,
-	pass: &'a GraphicalPass<P>,
+	pub(super) frame: Frame,
+	pub(super) pass: &'a GraphicalPass<P>,
 }
 
 /// Error finishing the frame.
@@ -58,7 +58,7 @@ impl Frame {
 	{
 		let used_swapchain = swapchain.swapchain.clone();
 
-		let (image_index, image_acquire_time) = match vulkano::swapchain::acquire_next_image(used_swapchain.clone(), None) {
+		let (swapchain_index, image_acquire_time) = match vulkano::swapchain::acquire_next_image(used_swapchain.clone(), None) {
 			Ok(result) => result,
 			Err(err) => return Err((device, err)),
 		};
@@ -79,7 +79,7 @@ impl Frame {
 			dynamic_state: swapchain.dynamic_state.clone(),
 			time,
 			commands,
-			image_index,
+			swapchain_index,
 		};
 		Ok(frame)
 	}
@@ -88,7 +88,6 @@ impl Frame {
 	/// 
 	/// # Panic.
 	/// 
-	/// - Panics if fails to create the [framebuffer](https://vulkan.lunarg.com/doc/view/1.0.26.0/linux/vkspec.chunked/ch07s03.html) structure for the pass.
 	/// - Panics if fails to begin the [renderpass](https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch07.html) command.
 	pub fn begin_pass<'a, P : ?Sized, F>(
 		mut self,
@@ -117,14 +116,14 @@ impl Frame {
 	/// 
 	/// - Panics if fails to build (finalize) the command buffer.
 	#[inline]
-	pub fn finish_frame(self) -> Result<Device, (Device, FrameFinishError)> {
+	pub fn finish(self) -> Result<Device, (Device, FrameFinishError)> {
 		let commands = self.commands.build().unwrap();
 		let after_execute = match self.time.then_execute(self.device.graphics_queue.clone(), commands) {
 			Ok(future) => future,
 			Err(err) => return Err((self.device, FrameFinishError::Commands(err))),
 		};
 
-		let after_flush = after_execute.then_swapchain_present(self.device.graphics_queue.clone(), self.swapchain, self.image_index)
+		let after_flush = after_execute.then_swapchain_present(self.device.graphics_queue.clone(), self.swapchain, self.swapchain_index)
 			.then_signal_fence_and_flush();
 		
 		let after_frame = match after_flush {
@@ -133,20 +132,6 @@ impl Frame {
 		};
 		let device = Device { before_frame: Some(Box::new(after_frame)), .. self.device };
 		Ok(device)
-	}
-
-	// Get the color image used for this frame.
-	//
-	// This frame will be presented after [Frame::finish_frame] is called.
-	#[inline]
-	pub fn get_swapchain_image(&self, swapchain: &Swapchain) -> Arc<SwapchainImage<Arc<Window>>> {
-		swapchain.images[self.image_index].clone()
-	}
-
-	/// Get the depth image used for this frame.
-	#[inline]
-	pub fn get_swapchain_depth(&self, swapchain: &Swapchain) -> Arc<AttachmentImage> {
-		swapchain.depths[self.image_index].clone()
 	}
 }
 

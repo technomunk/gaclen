@@ -37,8 +37,9 @@ fn main() {
 	);
 	
 	let context = graphics::context::Context::new().unwrap();
-	let mut device = graphics::device::Device::new(&context, window.clone(), graphics::device::PresentMode::Immediate).unwrap();
+	let mut device = graphics::device::Device::new(&context).unwrap();
 	println!("Initialized device: {:?}", device);
+	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::PixelFormat::D16Unorm).expect("Failed to create swapchain!");
 
 	let pass = {
 		let vs = shaders::vertex::Shader::load(&device).unwrap();
@@ -48,12 +49,12 @@ fn main() {
 			.single_buffer_input::<Vertex>()
 			.vertex_shader(vs.main_entry_point(), ())
 			.fragment_shader(fs.main_entry_point(), ())
-			.add_image_attachment_swapchain_cleared(&device)
-			.add_depth_attachment_swapchain_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
+			.add_image_attachment_swapchain_cleared(&swapchain)
+			.add_depth_attachment_swapchain_discard(&swapchain, graphics::pass::LoadOp::Clear).unwrap()
 			.build(&device).unwrap()
 	};
 
-	let triangle_buffer = device.create_cpu_accessible_buffer([
+	let triangle_buffer = graphics::buffer::CpuAccessibleBuffer::from_iter(device.logical_device(), graphics::buffer::BufferUsage::all(), [
 		Vertex { position: [-0.5, 0.5, 0.0 ], color: [ 0.25, 0.75, 0.25, 1.0 ] },
 		Vertex { position: [ 0.5,-0.5, 0.0 ], color: [ 0.75, 0.25, 0.25, 1.0 ] },
 		Vertex { position: [ 0.5, 0.5, 0.0 ], color: [ 0.75, 0.75, 0.25, 0.0 ] },
@@ -68,8 +69,9 @@ fn main() {
 	let mut running = true;
 	while running {
 		if recreate_swapchain {
-			// Sometimes the swapchain fails to create :(
-			match device.resize_for_window(&window) {
+			let dimensions = window.get_inner_size().unwrap();
+
+			match swapchain.resize(dimensions.into()) {
 				Ok(()) => (),
 				Err(graphics::ResizeError::Swapchain(_)) => {
 					println!("Failed to resize window, skipping frame!");
@@ -83,22 +85,23 @@ fn main() {
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 		let push_constants = push_constants_from_time(start_time.elapsed().as_secs_f32(), window.get_inner_size().unwrap().into());
 
-		let frame = device.begin_frame().unwrap();
+		let frame = graphics::frame::Frame::begin(device, &swapchain).unwrap();
 
 		let framebuffer = std::sync::Arc::new(pass.start_framebuffer()
-			.add(frame.get_swapchain_image()).unwrap()
-			.add(frame.get_swapchain_depth()).unwrap()
+			.add(swapchain.get_color_image_for(&frame)).unwrap()
+			.add(swapchain.get_depth_image_for(&frame)).unwrap()
 			.build().unwrap()
 		);
 
 		let after_frame = frame.begin_pass(&pass, framebuffer, vec![clear_color.into(), 1.0f32.into()])
 			.draw(vec![triangle_buffer.clone()], (), push_constants)
-			.finish_pass().finish_frame();
+			.finish_pass()
+		.finish();
 		
 		device = match after_frame {
 			Ok(device) => device,
 			Err((device, err)) => {
-				if err == graphics::device::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
+				if err == graphics::frame::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
 				device
 			},
 		};

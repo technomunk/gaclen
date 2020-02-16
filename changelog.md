@@ -9,6 +9,7 @@
 - **!BREAKING CHANGE!** refactors `Device`, by moving the functionality into relevant modules:
   - splits `swapchain::Swapchain` away from device, it now has to be created and used separately
   - splits `frame::Frame` and `frame::PassInFrame` from the device module
+  - splits buffer and image creation into `buffer` and `image` modules
 
 ## 0.0.9 Unclear Passes
 

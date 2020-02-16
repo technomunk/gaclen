@@ -1,8 +1,9 @@
 // TODO/rel: explain swapchains.
 
+use super::ResizeError;
 use super::context::Context;
 use super::device::Device;
-use super::ResizeError;
+use super::frame::Frame;
 
 use crate::window::Window;
 
@@ -12,8 +13,10 @@ use vulkano::command_buffer::DynamicState;
 use vulkano::device::{Device as LogicalDevice, Queue as DeviceQueue};
 use vulkano::format::Format;
 use vulkano::image::{AttachmentImage, SwapchainImage, ImageCreationError};
-use vulkano::swapchain::{Surface, Swapchain as VlkSwapchain, SwapchainCreationError as VlkSwapchainCreationError, PresentMode};
+use vulkano::swapchain::{Surface, Swapchain as VlkSwapchain, SwapchainCreationError as VlkSwapchainCreationError};
 use vulkano::pipeline::viewport::Viewport;
+
+pub use vulkano::swapchain::PresentMode;
 
 type ImageFormat = (Format, vulkano::swapchain::ColorSpace);
 
@@ -51,7 +54,7 @@ pub enum SwapchainCreationError {
 
 impl Swapchain {
 	/// Create a new Swapchain using provided Device.
-	pub fn create(
+	pub fn new(
 		context: &Context,
 		device: &Device,
 		window: Arc<Window>,
@@ -105,13 +108,8 @@ impl Swapchain {
 		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, inverse);
 	}
 
-	/// Update the swapchain for the resized window.
-	pub fn resize_for_window(&mut self, window: &Window) -> Result<(), ResizeError> {
-		let dimensions: (u32, u32) = match window.get_inner_size() {
-			Some(size) => size.into(),
-			None => return Err(ResizeError::UnsizedWindow),
-		};
-
+	/// Resize the images in the swapchain to provided size.
+	pub fn resize(&mut self, dimensions: (u32, u32)) -> Result<(), ResizeError> {
 		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, self.inverse_depth);
 
 		// TODO: investigate weird UnsupportedDimensions swapchain error on some resizes
@@ -129,6 +127,16 @@ impl Swapchain {
 		};
 
 		Ok(())
+	}
+
+	/// Get the target image to draw to for provided frame.
+	pub fn get_color_image_for(&self, frame: &Frame) -> Arc<SwapchainImage<Arc<Window>>> {
+		self.images[frame.swapchain_index].clone()
+	}
+
+	/// Get the target depth image to draw to for provided frame.
+	pub fn get_depth_image_for(&self, frame: &Frame) -> Arc<AttachmentImage> {
+		self.depths[frame.swapchain_index].clone()
 	}
 }
 

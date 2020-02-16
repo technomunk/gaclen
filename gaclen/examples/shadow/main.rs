@@ -32,8 +32,9 @@ fn main() {
 	);
 	
 	let context = graphics::context::Context::new().unwrap();
-	let mut device = graphics::device::Device::new(&context, window.clone(), graphics::device::PresentMode::Immediate).unwrap();
+	let mut device = graphics::device::Device::new(&context).unwrap();
 	println!("Initialized device: {:?}", device);
+	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::PixelFormat::D16Unorm).expect("Failed to create swapchain!");
 
 	let albedo_pass = {
 		let vs = shaders::albedo::vertex::Shader::load(&device).unwrap();
@@ -43,8 +44,8 @@ fn main() {
 			.single_buffer_input::<Vertex>()
 			.vertex_shader(vs.main_entry_point(), ())
 			.fragment_shader(fs.main_entry_point(), ())
-			.add_image_attachment_swapchain_cleared(&device)
-			.add_depth_attachment_swapchain_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
+			.add_image_attachment_swapchain_cleared(&swapchain)
+			.add_depth_attachment_swapchain_discard(&swapchain, graphics::pass::LoadOp::Clear).unwrap()
 			.build(&device).unwrap()
 	};
 
@@ -56,8 +57,10 @@ fn main() {
 	let mut running = true;
 	while running {
 		if recreate_swapchain {
+			let dimensions = window.get_inner_size().unwrap();
+
 			// Sometimes the swapchain fails to create :(
-			match device.resize_for_window(&window) {
+			match swapchain.resize(dimensions.into()) {
 				Ok(()) => (),
 				Err(graphics::ResizeError::Swapchain(_)) => {
 					println!("Failed to resize window, skipping frame!");
@@ -70,11 +73,11 @@ fn main() {
 
 		let clear_color = [0.0, 0.0, 0.0, 1.0];
 
-		let frame = device.begin_frame().unwrap();
+		let frame = graphics::frame::Frame::begin(device, &swapchain).unwrap();
 
 		let framebuffer = std::sync::Arc::new(albedo_pass.start_framebuffer()
-			.add(frame.get_swapchain_image()).unwrap()
-			.add(frame.get_swapchain_depth()).unwrap()
+			.add(swapchain.get_color_image_for(&frame)).unwrap()
+			.add(swapchain.get_depth_image_for(&frame)).unwrap()
 			.build().unwrap()
 		);
 
@@ -82,12 +85,12 @@ fn main() {
 			.draw(vec![quad.clone()], (), ())
 			.draw(vec![cube.clone()], (), ())
 			.finish_pass()
-		.finish_frame();
+		.finish();
 		
 		device = match after_frame {
 			Ok(device) => device,
 			Err((device, err)) => {
-				if err == graphics::device::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
+				if err == graphics::frame::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
 				device
 			},
 		};

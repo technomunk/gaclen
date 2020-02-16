@@ -1,6 +1,7 @@
 use gaclen::graphics::device::Device as GaclenDevice;
 use gaclen::graphics::vulkano::memory::DeviceMemoryAllocError;
-use gaclen::graphics::vulkano::buffer::CpuAccessibleBuffer;
+use gaclen::graphics::buffer::{BufferUsage, CpuAccessibleBuffer};
+
 use std::sync::Arc;
 
 #[derive(Clone, Default)]
@@ -13,7 +14,7 @@ pub struct Vertex {
 gaclen::graphics::impl_vertex!(Vertex, position, normal, uv);
 
 pub fn generate_cube(device: &GaclenDevice) -> Result<Arc<CpuAccessibleBuffer<[Vertex]>>, DeviceMemoryAllocError> {
-	device.create_cpu_accessible_buffer([
+	CpuAccessibleBuffer::from_iter(device.logical_device(), BufferUsage::all(), [
 		// X-
 		Vertex { position: [ -0.5,  0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 1.0, 1.0 ] },
 		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 0.0, 1.0 ] },

@@ -34,8 +34,9 @@ fn main() {
 	);
 	
 	let context = graphics::context::Context::new().unwrap();
-	let mut device = graphics::device::Device::new(&context, window.clone(), graphics::device::PresentMode::Immediate).unwrap();
+	let mut device = graphics::device::Device::new(&context).unwrap();
 	println!("Initialized device: {:?}", device);
+	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::PixelFormat::D16Unorm).expect("Failed to create swapchain!");
 
 	let albedo_pass = {
 		let vs = shaders::vertex::Shader::load(&device).unwrap();
@@ -48,26 +49,26 @@ fn main() {
 			.basic_depth_test()
 			.front_face_clockwise()
 			.cull_back()
-			.add_image_attachment_swapchain_cleared(&device)
-			.add_depth_attachment_swapchain_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
+			.add_image_attachment_swapchain_cleared(&swapchain)
+			.add_depth_attachment_swapchain_discard(&swapchain, graphics::pass::LoadOp::Clear).unwrap()
 			.build(&device).unwrap()
 	};
 
 	let geometry = geometry::generate_cube(&device).unwrap();
 
-	let transform_buffer_pool = device.create_cpu_buffer_pool::<shaders::vertex::ty::TransformData>(graphics::BufferUsage::all());
-	let light_buffer_pool = device.create_cpu_buffer_pool::<shaders::fragment::ty::LightData>(graphics::BufferUsage::all());
+	let transform_buffer_pool = graphics::buffer::CpuBufferPool::<shaders::vertex::ty::TransformData>::new(device.logical_device(), graphics::buffer::BufferUsage::all());
+	let light_buffer_pool = graphics::buffer::CpuBufferPool::<shaders::fragment::ty::LightData>::new(device.logical_device(), graphics::buffer::BufferUsage::all());
 
 	let texture = {
 		let image = image::open("gaclen/examples/phong_cube/texture.png").unwrap().to_rgba();
 		let (width, height) = image.dimensions();
-        let dimensions = graphics::Dimensions::Dim2d { width, height };
+        let dimensions = graphics::image::Dimensions::Dim2d { width, height };
 		let image_data = image.into_raw(); // to_rgba() returns Vec<u8> backed container
 		
-		device.create_immutable_image_from_iter(image_data.iter().cloned(), dimensions, graphics::PixelFormat::R8G8B8A8Srgb).unwrap()
+		graphics::image::create_immutable_image_from_iter(&device, image_data.iter().cloned(), dimensions, graphics::PixelFormat::R8G8B8A8Srgb).unwrap()
 	};
 
-	let sampler = device.create_simple_linear_repeat_sampler().unwrap();
+	let sampler = graphics::image::Sampler::simple_repeat_linear(device.logical_device());
 	
 	let light = {
 		let data = shaders::fragment::ty::LightData {
@@ -94,8 +95,8 @@ fn main() {
 	let mut running = true;
 	while running {
 		if recreate_swapchain {
-			// Sometimes the swapchain fails to create :(
-			match device.resize_for_window(&window) {
+			let dimensions = window.get_inner_size().unwrap();
+			match swapchain.resize(dimensions.into()) {
 				Ok(()) => (),
 				Err(graphics::ResizeError::Swapchain(_)) => {
 					println!("Failed to resize window, skipping frame!");
@@ -117,23 +118,23 @@ fn main() {
 			.add_buffer(transform).unwrap()
 			.build().unwrap());
 
-		let frame = device.begin_frame().unwrap();
+		let frame = graphics::frame::Frame::begin(device, &swapchain).unwrap();
 
 		let framebuffer = std::sync::Arc::new(albedo_pass.start_framebuffer()
-			.add(frame.get_swapchain_image()).unwrap()
-			.add(frame.get_swapchain_depth()).unwrap()
+			.add(swapchain.get_color_image_for(&frame)).unwrap()
+			.add(swapchain.get_depth_image_for(&frame)).unwrap()
 			.build().unwrap()
 		);
 
 		let after_frame = frame.begin_pass(&albedo_pass, framebuffer, vec![clear_color.into(), 1f32.into()])
 			.draw(vec![geometry.clone()], (transform_descriptor_set, light_descriptor_set.clone()), ())
 			.finish_pass()
-		.finish_frame();
+		.finish();
 		
 		device = match after_frame {
 			Ok(device) => device,
 			Err((device, err)) => {
-				if err == graphics::device::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
+				if err == graphics::frame::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
 				device
 			},
 		};

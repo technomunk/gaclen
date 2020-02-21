@@ -1,15 +1,13 @@
 [package]
-name = "vulkano-shaders"
-version = "0.17.0"
+name = "gaclen_shader"
+version = "0.0.9"
+authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
 edition = "2018"
-authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>", "The vulkano contributors"]
-repository = "https://github.com/vulkano-rs/vulkano"
-description = "Shaders rust code generation macro"
-license = "MIT/Apache-2.0"
-documentation = "https://docs.rs/vulkano"
-homepage = "https://vulkano.rs"
-keywords = ["vulkan", "bindings", "graphics", "gpu", "rendering"]
-categories = ["rendering::graphics-api"]
+
+description = "Tweaked re-export of vulkano_shader! procedural macro."
+keywords = ["gaclen", "vulkan", "macro"]
+categories = ["graphics", "rust-patterns"]
+license = "Apache-2.0 OR MIT"
 
 [lib]
 proc-macro = true
@@ -19,9 +17,3 @@ shaderc = "0.6"
 syn = "1.0"
 quote = "1.0"
 proc-macro2 = "1.0"
-
-[dev-dependencies]
-vulkano = { version = "0.17", path = "../vulkano" }
-
-[features]
-shaderc-build-from-source = ["shaderc/build-from-source"]

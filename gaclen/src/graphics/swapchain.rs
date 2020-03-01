@@ -35,7 +35,7 @@ pub struct Swapchain {
 	pub(super) dynamic_state: DynamicState,
 }
 
-/// An error during the creation of a [Swapchain].
+/// An error during the creation of a [`Swapchain`](struct.Swapchain.html).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SwapchainCreationError {
 	/// Error during the creation of draw-surface.

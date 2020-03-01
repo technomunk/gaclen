@@ -29,7 +29,7 @@ pub struct Frame {
 	pub(super) swapchain_index: usize,
 }
 
-/// A frame in the process of being drawn using a given [GraphicalPass].
+/// A frame in the process of being drawn using a given [`GraphicalPass`](struct.GraphicalPass.html).
 pub struct PassInFrame<'a, P : ?Sized> {
 	pub(super) frame: Frame,
 	pub(super) pass: &'a GraphicalPass<P>,
@@ -50,7 +50,7 @@ impl Frame {
 	/// - Locks down the Device for the drawing process (consuming it for the duration of the frame).
 	/// - Acquires the swapchain image to draw to.
 	/// - Creates a CommandBuffer to be recorded for the frame.
-	/// NOTE: that to actually draw, [Frame::begin_pass] needs to be called.
+	/// NOTE: that to actually draw, [`Frame::begin_pass()`](struct.Frame.html#method.begin_pass) needs to be called.
 	pub fn begin(
 		mut device: Device,
 		swapchain: &Swapchain,
@@ -111,7 +111,7 @@ impl Frame {
 
 	/// Finish drawing the frame and flush the commands to the GPU.
 	/// 
-	/// Releases the Device to allow starting a new frame, allocate new resources and anything else a [Device] is able to do.
+	/// Releases the Device to allow starting a new frame, allocate new resources and anything else a [`Device`](struct.Device.html) is able to do.
 	/// 
 	/// # Panic.
 	/// 
@@ -145,8 +145,8 @@ where
 
 	/// Draw some data using a pass.
 	/// 
-	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
-	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
+	/// The result depends highly on the [`GraphicalPass`](struct.GraphicalPass.html) that was used to create the [`PassInFrame`](struct.PassInFrame.html).
+	/// Push-constants should correspond to the ones in the shader used for creating the [`GraphicalPass`](struct.GraphicalPass.html).
 	/// 
 	/// # Panic.
 	/// 
@@ -168,8 +168,8 @@ where
 
 	/// Draw some indexed vertex data using a pass.
 	/// 
-	/// The result depends highly on the [GraphicalPass](traits.GraphicalPass.html) that was used to create the [PassInFrame].
-	/// Push-constants should correspond to the ones in the shader used for creating the [GraphicalPass](traits.GraphicalPass.html).
+	/// The result depends highly on the [`GraphicalPass`](struct.GraphicalPass.html) that was used to create the [`PassInFrame`](struct.PassInFrame.html).
+	/// Push-constants should correspond to the ones in the shader used for creating the [`GraphicalPass`](struct.GraphicalPass.html).
 	/// 
 	/// # Panic.
 	/// 
@@ -194,7 +194,7 @@ where
 
 	/// Finish using a GraphicalPass.
 	/// 
-	/// Releases the consumed [Frame] to begin the next pass or finish the frame.
+	/// Releases the consumed [`Frame`](struct.Frame.html) to begin the next pass or finish the frame.
 	/// 
 	/// # Panic.
 	/// 

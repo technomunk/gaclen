@@ -19,7 +19,7 @@ use std::sync::Arc;
 pub use vulkano::pipeline::input_assembly::PrimitiveTopology;
 pub use vulkano::framebuffer::{StoreOp, LoadOp};
 
-/// A structure for initializing [GraphicalPasses](struct.GraphicalPass).
+/// A structure for initializing [`GraphicalPasses`](struct.GraphicalPass.html).
 pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	vertex_input: VI,
 	vertex_shader: (VS, VSS),
@@ -33,7 +33,7 @@ pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	depth_attachment: Option<usize>,
 }
 
-/// Error during GraphicalPassBuilder setup.
+/// Error during `GraphicalPassBuilder` setup.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AttachmentError {
 	/// The format supplied cannot be used for requested purposes.
@@ -47,9 +47,9 @@ pub enum AttachmentError {
 /// Error during GraphicalPassBuilder::build.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BuildError {
-	/// Error during creation of a [RenderPass].
+	/// Error during creation of a [`RenderPass`](struct.RenderPass.html).
 	RenderPassCreation(RenderPassCreationError),
-	/// Error during creation of a [GraphicsPipeline].
+	/// Error during creation of a [`GraphicsPipeline`](struct.GraphicsPipeline.html).
 	GraphicsPipelineCreation(GraphicsPipelineCreationError),
 	/// No attachments were added to the pass, therefore no invocation is possible!
 	NoAttachments,
@@ -92,33 +92,33 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// Use a single buffer of provided vertex type as input.
 	pub fn single_buffer_input<V>(self) -> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VSS, FS, FSS> { self.vertex_input(SingleBufferDefinition::<V>::new()) }
 
-	/// Use given [PrimitiveTopology].
+	/// Use given [`PrimitiveTopology`](enum.PrimitiveTopology.html).
 	/// 
-	/// Default is [PrimitiveTopology::TriangleList].
+	/// Default is [`PrimitiveTopology::TriangleList`](enum.PrimitiveTopology.html#variant.TriangleList).
 	pub fn primitive_topology(self, topology: PrimitiveTopology) -> Self { Self { primitive_topology: topology, .. self } }
-	/// Use [PrimitiveTopology::PointList]. 
+	/// Use [`PrimitiveTopology::PointList`](enum.PrimitiveTopology.html#variant.PointList). 
 	pub fn point_list(self) -> Self { self.primitive_topology(PrimitiveTopology::PointList) }
-	/// Use [PrimitiveTopology::LineList].
+	/// Use [`PrimitiveTopology::LineList`](enum.PrimitiveTopology.html#variant.LineList).
 	pub fn line_list(self) -> Self { self.primitive_topology(PrimitiveTopology::LineList) }
-	/// Use [PrimitiveTopology::LineStrip].
+	/// Use [`PrimitiveTopology::LineStrip`](enum.PrimitiveTopology.html#variant.LineStrip).
 	pub fn line_strip(self) -> Self { self.primitive_topology(PrimitiveTopology::LineStrip) }
-	/// Use [PrimitiveTopology::TriangleList].
+	/// Use [`PrimitiveTopology::TriangleList`](enum.PrimitiveTopology.html#variant.TriangleList).
 	/// 
 	/// This is the default.
 	pub fn triangle_list(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleList) }
-	/// Use [PrimitiveTopology::TriangleStrip].
+	/// Use [`PrimitiveTopology::TriangleStrip`](enum.PrimitiveTopology.html#variant.TriangleStrip).
 	pub fn triangle_strip(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleStrip) }
-	/// Use [PrimitiveTopology::TriangleFan].
+	/// Use [`PrimitiveTopology::TriangleFan`](enum.PrimitiveTopology.html#variant.TriangleFan).
 	pub fn triangle_fan(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleFan) }
-	/// Use [PrimitiveTopology::LineListWithAdjacency].
+	/// Use [`PrimitiveTopology::LineListWithAdjacency`](enum.PrimitiveTopology.html#variant.LineListWithAdjacency).
 	pub fn line_list_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::LineListWithAdjacency) }	
-	/// Use [PrimitiveTopology::LineStripWithAdjacency].
+	/// Use [`PrimitiveTopology::LineStripWithAdjacency`](enum.PrimitiveTopology.html#variant.LineStripWithAdjacency).
 	pub fn line_strip_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::LineStripWithAdjacency) }
-	/// Use [PrimitiveTopology::TriangleListWithAdjacency].
+	/// Use [`PrimitiveTopology::TriangleListWithAdjacency`](enum.PrimitiveTopology.html#variant.TriangleListWithAdjacency).
 	pub fn triangle_list_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleListWithAdjacency) }
-	/// Use [PrimitiveTopology::TriangleStripWithAdjacency].
+	/// Use [`PrimitiveTopology::TriangleStripWithAdjacency`](enum.PrimitiveTopology.html#variant.TriangleStripWithAdjacency).
 	pub fn triangle_strip_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleStripWithAdjacency) }
-	/// Use [PrimitiveTopology::PatchList].
+	/// Use [`PrimitiveTopology::PatchList`](enum.PrimitiveTopology.html#variant.PatchList).
 	pub fn patch_list(self, vertices_per_patch: u32) -> Self { self.primitive_topology(PrimitiveTopology::PatchList{ vertices_per_patch }) }
 
 	/// Set whether to clamp depth values of vertices.
@@ -127,7 +127,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// If false those vertices will be dropped.
 	pub fn clamp_depth(mut self, clamp: bool) -> Self { self.rasterization.depth_clamp = clamp; self }
 
-	/// Use provided [PolygonMode] for rasterizer (disassemble input primitives into provided types).
+	/// Use provided [`PolygonMode`](enum.PolygonMode.html) for rasterizer (disassemble input primitives into provided types).
 	pub fn raster_polygon_mode(mut self, mode: PolygonMode) -> Self { self.rasterization.polygon_mode = mode; self }
 
 	/// Use provided [CullMode] for rasterizer. Culled faces are dropped before fragment stage.
@@ -143,9 +143,9 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// Cull both back and front faces.
 	pub fn cull_front_and_back(self) -> Self { self.cull_mode(CullMode::FrontAndBack) }
 
-	/// Use provided [FrontFace].
+	/// Use provided [`FrontFace`](enum.FrontFace.html).
 	/// 
-	/// Default is [FrontFace::CounterClockwise].
+	/// Default is [`FrontFace::CounterClockwise`](enum.FrontFace.html#CounterClockwise).
 	pub fn front_face(mut self, face: FrontFace) -> Self { self.rasterization.front_face = face; self }
 	/// Set clockwise faces as front.
 	pub fn front_face_clockwise(self) -> Self { self.front_face(FrontFace::Clockwise) }
@@ -305,14 +305,14 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 
 	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
 	/// 
-	/// Shorthand for supplying StoreOp::DontCare as store parameter to add_depth_attachment_swapchain.
+	/// Shorthand for supplying `StoreOp::DontCare` as store parameter to add_depth_attachment_swapchain.
 	pub fn add_depth_attachment_swapchain_discard(self, swapchain: &Swapchain, load: LoadOp) -> Result<Self, AttachmentError> {
 		self.add_depth_attachment_swapchain(swapchain, load, StoreOp::DontCare)
 	}
 
 	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
 	/// 
-	/// Shorthand for supplying StoreOp::Store as store parameter to add_depth_attachment_swapchain.
+	/// Shorthand for supplying `StoreOp::Store` as store parameter to add_depth_attachment_swapchain.
 	pub fn add_depth_attachment_swapchain_preserve(self, swapchain: &Swapchain, load: LoadOp) -> Result<Self, AttachmentError> {
 		self.add_depth_attachment_swapchain(swapchain, load, StoreOp::Store)
 	}

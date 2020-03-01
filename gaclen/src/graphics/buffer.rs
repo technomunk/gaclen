@@ -2,13 +2,13 @@
 //!
 //! Gaclen exports vulkano buffers:
 //! 
-//! - [`CpuAccessibleBuffer`](CpuAccessibleBuffer) : simple buffer for quick prototyping.
-//! - [`CpuBufferPool`](CpuBufferPool) : ring buffer for per-frame data.
-//! - [`ImmutableBuffer`](ImmutableBuffer) : an idiomatic device-local buffer for read-only data.
+//! - [`CpuAccessibleBuffer`](struct.CpuAccessibleBuffer.html) : simple buffer for quick prototyping.
+//! - [`CpuBufferPool`](struct.CpuBufferPool.html) : ring buffer for per-frame data.
+//! - [`ImmutableBuffer`](struct.ImmutableBuffer.html) : an idiomatic device-local buffer for read-only data.
 //! 
 //! # Usage
 //! 
-//! [`CpuBufferPool`](CpuBufferPool) and [`CpuAccessibleBuffer`](CpuAccessibleBuffer) can be created directly, using [`Device::logical_device()`](Device::logical_device):
+//! [`CpuBufferPool`](struct.CpuBufferPool.html) and [`CpuAccessibleBuffer`](struct.CpuAccessibleBuffer.html) can be created directly, using [`Device::logical_device()`](struct.Device.html#method.logical_device):
 //! ```
 //! let device : gaclen::graphics::Device;
 //! let usage = gaclen::graphics::buffer::BufferUsage::all();
@@ -16,7 +16,7 @@
 //! // buffer is ready to use.
 //! ```
 //! 
-//! Device-local buffers (currently only [`ImmutableBuffer`](ImmutableBuffer)) require additional initialization (uploading data to the GPU) and can thus be created through helper methods:
+//! Device-local buffers (currently only [`ImmutableBuffer`](struct.ImmutableBuffer.html)) require additional initialization (uploading data to the GPU) and can thus be created through helper methods:
 //! ```
 //! let data : Sized + Send + Sync + 'static;
 //! let device : gaclen::graphics::Device;

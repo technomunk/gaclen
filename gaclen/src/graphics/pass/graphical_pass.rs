@@ -36,7 +36,7 @@ impl<P : ?Sized> GraphicalPass<P>
 }
 
 #[derive(Debug, Clone)]
-pub struct GraphicalRenderPassDescription {
+pub(in crate::graphics) struct GraphicalRenderPassDescription {
 	/// Image attachments of the render pass.
 	pub attachments: Vec<AttachmentDescription>,
 	/// Depth stencil attachment index.

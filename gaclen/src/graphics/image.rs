@@ -10,7 +10,7 @@ use vulkano::format::{AcceptsPixels, Format, FormatDesc};
 pub use vulkano::image::{Dimensions, ImmutableImage, ImageCreationError};
 pub use vulkano::sampler::{Filter, Sampler, SamplerCreationError, SamplerAddressMode, MipmapMode};
 
-/// Create an [ImmutableImage] from a data iterator.
+/// Create an [`ImmutableImage`](struct.ImmutableImage.html) from a data iterator.
 /// 
 /// Builds an intermediate memory-mapped buffer, writes data to it, builds a copy (upload) command buffer and executes it.
 /// 

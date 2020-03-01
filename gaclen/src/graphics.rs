@@ -26,9 +26,9 @@ const ENGINE_VERSION: Version = Version { major: 0, minor: 0, patch: 0 };
 /// Error during resizing of viewports.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResizeError {
-	/// Error during recreation of the [Device](struct.Device) swapchain.
+	/// Error during recreation of the [`Swapchain`](struct.Swapchain.html).
 	Swapchain(vulkano::swapchain::SwapchainCreationError),
-	/// Error during recreation of depth image of the [Device](struct.Device) swapchain.
+	/// Error during recreation of depth image of the [`Swapchain`](struct.Swapchain.html).
 	Image(vulkano::image::ImageCreationError),
 	/// The window provided has no apparent size.
 	UnsizedWindow,

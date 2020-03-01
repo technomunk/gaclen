@@ -29,7 +29,7 @@ pub struct Frame {
 	pub(super) swapchain_index: usize,
 }
 
-/// A frame in the process of being drawn using a given [`GraphicalPass`](struct.GraphicalPass.html).
+/// A frame in the process of being drawn using a given [`GraphicalPass`](../pass/struct.GraphicalPass.html).
 pub struct PassInFrame<'a, P : ?Sized> {
 	pub(super) frame: Frame,
 	pub(super) pass: &'a GraphicalPass<P>,
@@ -86,7 +86,7 @@ impl Frame {
 		Ok(frame)
 	}
 
-	/// Begins using a [`GraphicalPass`](struct.GraphicalPass.html).
+	/// Begins using a [`GraphicalPass`](../pass/struct.GraphicalPass.html).
 	/// 
 	/// Switches the GPU state to use a provided pass' pipeline for drawing.
 	/// 
@@ -148,8 +148,8 @@ where
 
 	/// Draw some data using a pass.
 	/// 
-	/// The result depends highly on the [`GraphicalPass`](struct.GraphicalPass.html) that was used to create the [`PassInFrame`](struct.PassInFrame.html).
-	/// Push-constants should correspond to the ones in the shader used for creating the [`GraphicalPass`](struct.GraphicalPass.html).
+	/// The result depends highly on the [`GraphicalPass`](../pass/struct.GraphicalPass.html) that was used to create the [`PassInFrame`](struct.PassInFrame.html).
+	/// Push-constants should correspond to the ones in the shader used for creating the [`GraphicalPass`](../pass/struct.GraphicalPass.html).
 	/// 
 	/// # Panic.
 	/// 
@@ -171,8 +171,8 @@ where
 
 	/// Draw some indexed vertex data using a pass.
 	/// 
-	/// The result depends highly on the [`GraphicalPass`](struct.GraphicalPass.html) that was used to create the [`PassInFrame`](struct.PassInFrame.html).
-	/// Push-constants should correspond to the ones in the shader used for creating the [`GraphicalPass`](struct.GraphicalPass.html).
+	/// The result depends highly on the [`GraphicalPass`](../pass/struct.GraphicalPass.html) that was used to create the [`PassInFrame`](struct.PassInFrame.html).
+	/// Push-constants should correspond to the ones in the shader used for creating the [`GraphicalPass`](../pass/struct.GraphicalPass.html).
 	/// 
 	/// # Panic.
 	/// 

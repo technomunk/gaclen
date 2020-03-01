@@ -14,7 +14,7 @@ pub struct Vertex {
 gaclen::graphics::impl_vertex!(Vertex, position, normal, uv);
 
 pub fn generate_cube(device: &GaclenDevice) -> Result<Arc<CpuAccessibleBuffer<[Vertex]>>, DeviceMemoryAllocError> {
-	CpuAccessibleBuffer::from_iter(device.logical_device(), BufferUsage::all(), [
+	CpuAccessibleBuffer::from_iter(device.logical_device(), BufferUsage::all(), false, [
 		// X-
 		Vertex { position: [ -0.5,  0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 1.0, 1.0 ] },
 		Vertex { position: [ -0.5, -0.5, -0.5 ], normal: [ -1.0, 0.0, 0.0 ], uv: [ 0.0, 1.0 ] },

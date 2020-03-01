@@ -5,7 +5,7 @@ use super::context::Context;
 use super::device::Device;
 use super::frame::Frame;
 
-use crate::window::Window;
+use winit::window::Window;
 
 use std::sync::Arc;
 
@@ -64,10 +64,7 @@ impl Swapchain {
 	{
 		let logical_device = device.logical_device();
 
-		let dimensions: (u32, u32) = match window.get_inner_size() {
-			Some(size) => size.into(),
-			None => return Err(SwapchainCreationError::UnsizedWindow),
-		};
+		let dimensions: (u32, u32) = window.inner_size().into();
 		let surface = vulkano_win::create_vk_surface(window, context.instance.clone())?;
 		let (swapchain, images) = create_swapchain(device, surface, dimensions, &device.graphics_queue, present_mode)?;
 
@@ -113,7 +110,7 @@ impl Swapchain {
 		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, self.inverse_depth);
 
 		// TODO: investigate weird UnsupportedDimensions swapchain error on some resizes
-		let (swapchain, images) = self.swapchain.recreate_with_dimension([dimensions.0, dimensions.1])?;
+		let (swapchain, images) = self.swapchain.recreate_with_dimensions([dimensions.0, dimensions.1])?;
 		self.swapchain = swapchain;
 		self.images = images;
 
@@ -161,13 +158,13 @@ fn create_swapchain(
 	let usage = capabilities.supported_usage_flags;
 	let alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
 
-	let format = select_format(capabilities.supported_formats)?;
+	let (format, color_space) = select_format(capabilities.supported_formats)?;
 
 	let swapchain = VlkSwapchain::new(
 		device.logical_device(),
 		surface,
 		capabilities.min_image_count,
-		format.0,
+		format,
 		[dimensions.0, dimensions.1],
 		1,
 		usage,
@@ -175,8 +172,9 @@ fn create_swapchain(
 		vulkano::swapchain::SurfaceTransform::Identity,
 		alpha,
 		present_mode,
+		vulkano::swapchain::FullscreenExclusive::Default,
 		true,
-		None
+		color_space
 	);
 	
 	match swapchain {

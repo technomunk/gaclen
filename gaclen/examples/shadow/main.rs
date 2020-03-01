@@ -5,11 +5,9 @@ mod geometry;
 
 use gaclen::graphics;
 
-use gaclen::window::{
-	WindowBuilder,
-	EventsLoop,
-	Event, WindowEvent,
-};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event::{Event, WindowEvent};
+use winit::window::WindowBuilder;
 
 #[derive(Default, Debug, Clone)]
 struct Vertex {
@@ -22,17 +20,17 @@ fn main() {
 	let mut frame_count: u64 = 0;
 	let start_time = std::time::Instant::now();
 
-	let mut events_loop = EventsLoop::new();
+	let event_loop = EventLoop::new();
 	let window = std::sync::Arc::new(
 		WindowBuilder::new()
 			.with_title("Shadowing example")
-			.with_dimensions((1280, 720).into())
-			.with_min_dimensions((1280, 720).into())
-			.build(&events_loop).unwrap()
+			.with_inner_size(winit::dpi::PhysicalSize::new(1280, 720))
+			.with_min_inner_size(winit::dpi::PhysicalSize::new(1280, 720))
+			.build(&event_loop).unwrap()
 	);
 	
 	let context = graphics::context::Context::new().unwrap();
-	let mut device = graphics::device::Device::new(&context).unwrap();
+	let device = graphics::device::Device::new(&context).unwrap();
 	println!("Initialized device: {:?}", device);
 	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::PixelFormat::D16Unorm).expect("Failed to create swapchain!");
 
@@ -54,60 +52,61 @@ fn main() {
 
 	let mut recreate_swapchain = false;
 
-	let mut running = true;
-	while running {
-		if recreate_swapchain {
-			let dimensions = window.get_inner_size().unwrap();
+	// Wrap the device in a stack-allocated container to allow for temporary ownership.
+	let mut device = Some(device);
 
-			// Sometimes the swapchain fails to create :(
-			match swapchain.resize(dimensions.into()) {
-				Ok(()) => (),
-				Err(graphics::ResizeError::Swapchain(_)) => {
-					println!("Failed to resize window, skipping frame!");
-					continue;
-				},
-				Err(err) => panic!(err),
-			};
-			recreate_swapchain = false;
-		}
-
-		let clear_color = [0.0, 0.0, 0.0, 1.0];
-
-		let frame = graphics::frame::Frame::begin(device, &swapchain).unwrap();
-
-		let framebuffer = std::sync::Arc::new(albedo_pass.start_framebuffer()
-			.add(swapchain.get_color_image_for(&frame)).unwrap()
-			.add(swapchain.get_depth_image_for(&frame)).unwrap()
-			.build().unwrap()
-		);
-
-		let after_frame = frame.begin_pass(&albedo_pass, framebuffer, vec![clear_color.into(), 1f32.into()])
-			.draw(vec![quad.clone()], (), ())
-			.draw(vec![cube.clone()], (), ())
-			.finish_pass()
-		.finish();
-		
-		device = match after_frame {
-			Ok(device) => device,
-			Err((device, err)) => {
-				if err == graphics::frame::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
-				device
+	event_loop.run(move |event, _, control_flow| {
+		match event {
+			Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+				*control_flow = ControlFlow::Exit;
+				let run_duration = start_time.elapsed().as_secs_f64();
+				let fps: f64 = frame_count as f64 / run_duration;
+				println!("Produced {} frames over {:.2} seconds ({:.2} avg fps)", frame_count, run_duration, fps);
 			},
+			Event::WindowEvent { event: WindowEvent::Resized(_), .. } => recreate_swapchain = true,
+			Event::RedrawEventsCleared => {
+				if recreate_swapchain {
+					let dimensions = window.inner_size();
+		
+					// Sometimes the swapchain fails to create :(
+					match swapchain.resize(dimensions.into()) {
+						Ok(()) => (),
+						Err(graphics::ResizeError::Swapchain(_)) => {
+							println!("Failed to resize window, skipping frame!");
+							return;
+						},
+						Err(err) => panic!(err),
+					};
+					recreate_swapchain = false;
+				}
+		
+				let clear_color = [0.0, 0.0, 0.0, 1.0];
+		
+				let frame = graphics::frame::Frame::begin(device.take().unwrap(), &swapchain).unwrap();
+		
+				let framebuffer = std::sync::Arc::new(albedo_pass.start_framebuffer()
+					.add(swapchain.get_color_image_for(&frame)).unwrap()
+					.add(swapchain.get_depth_image_for(&frame)).unwrap()
+					.build().unwrap()
+				);
+		
+				let after_frame = frame.begin_pass(&albedo_pass, framebuffer, vec![clear_color.into(), 1f32.into()])
+					.draw(vec![quad.clone()], (), ())
+					.draw(vec![cube.clone()], (), ())
+					.finish_pass()
+				.finish();
+				
+				device = match after_frame {
+					Ok(device) => Some(device),
+					Err((device, err)) => {
+						if err == graphics::frame::FrameFinishError::Flush(vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
+						Some(device)
+					},
+				};
+		
+				frame_count += 1;
+			},
+			_ => ()
 		};
-
-		frame_count += 1;
-
-		events_loop.poll_events(|event| {
-			match event {
-				Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => running = false,
-				Event::WindowEvent { event: WindowEvent::Resized(_), .. } => recreate_swapchain = true,
-				_ => ()
-			}
-		});
-	}
-
-	let run_duration = start_time.elapsed().as_secs_f64();
-	let fps: f64 = frame_count as f64 / run_duration;
-
-	println!("Produced {} frames over {:.2} seconds ({:.2} avg fps)", frame_count, run_duration, fps);
+	});
 }

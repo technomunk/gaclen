@@ -4,7 +4,7 @@ use super::device::Device;
 use super::pass::GraphicalPass;
 use super::swapchain::Swapchain;
 
-use crate::window::Window;
+use winit::window::Window;
 
 use std::sync::Arc;
 
@@ -58,7 +58,8 @@ impl Frame {
 	{
 		let used_swapchain = swapchain.swapchain.clone();
 
-		let (swapchain_index, image_acquire_time) = match vulkano::swapchain::acquire_next_image(used_swapchain.clone(), None) {
+		// TODO: propagate the should_recreate flag outside.
+		let (swapchain_index, _should_recreate, image_acquire_time) = match vulkano::swapchain::acquire_next_image(used_swapchain.clone(), None) {
 			Ok(result) => result,
 			Err(err) => return Err((device, err)),
 		};
@@ -136,9 +137,9 @@ impl Frame {
 }
 
 
-impl<'a, P> PassInFrame<'a, P>
+impl<'a, P : ?Sized> PassInFrame<'a, P>
 where
-	P : GraphicsPipelineAbstract + Send + Sync + ?Sized + 'static,
+	P : GraphicsPipelineAbstract + Send + Sync + 'static,
 {
 	// TODO: non-polymorphic vertex_buffer drawing
 

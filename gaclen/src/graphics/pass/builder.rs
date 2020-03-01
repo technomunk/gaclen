@@ -1,17 +1,18 @@
+use vulkano::pipeline::GraphicsPipelineAbstract;
+use crate::graphics;
+use graphics::device::Device;
+use graphics::swapchain::Swapchain;
+use graphics::pass::graphical_pass;
+use graphical_pass::{GraphicalPass, GraphicalRenderPassDescription};
+
 use vulkano::format::{Format, PossibleDepthFormatDesc};
-use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineAbstract, GraphicsPipelineCreationError};
+use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineCreationError};
 use vulkano::pipeline::depth_stencil::{Compare, DepthStencil};
 use vulkano::pipeline::shader::{SpecializationConstants, GraphicsEntryPointAbstract};
 use vulkano::pipeline::raster::{CullMode, FrontFace, PolygonMode, Rasterization};
 use vulkano::pipeline::vertex::{SingleBufferDefinition, VertexDefinition};
 use vulkano::framebuffer::{AttachmentDescription, RenderPassDesc, RenderPassCreationError, Subpass};
 use vulkano::image::ImageLayout;
-
-use crate::graphics;
-use graphics::device::Device;
-use graphics::swapchain::Swapchain;
-use graphics::pass::graphical_pass;
-use graphical_pass::{GraphicalPass, GraphicalRenderPassDescription};
 
 use std::sync::Arc;
 
@@ -328,7 +329,8 @@ where
 	VI : VertexDefinition<VS::InputDefinition> + Send + Sync + 'static,
 {
 	pub fn build(self, device: &Device)
-	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync>, BuildError> {
+	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync + 'static>, BuildError>
+	{
 		if self.attachments.is_empty() {
 			return Err(BuildError::NoAttachments)
 		};
@@ -349,7 +351,7 @@ where
 			.viewports_dynamic_scissors_irrelevant(1)
 			.fragment_shader(self.fragment_shader.0, self.fragment_shader.1)
 			.depth_stencil(self.depth_stencil)
-			.render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
+			.render_pass(Subpass::from(render_pass, 0).unwrap())
 			.depth_clamp(self.rasterization.depth_clamp)
 			;
 
@@ -376,10 +378,10 @@ where
 				None => builder,
 			};
 
-			Arc::new(builder.build(device.device.clone())?)
+			Arc::new(builder.build(device.logical_device())?)
 		};
 		
-		Ok(GraphicalPass { render_pass, pipeline, })
+		Ok(GraphicalPass { pipeline, })
 	}
 }
 

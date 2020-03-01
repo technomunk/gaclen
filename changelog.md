@@ -13,6 +13,8 @@
 - **!BREAKING CHANGE!** migrates to [vulkano 0.17](https://github.com/vulkano-rs/vulkano/blob/master/CHANGELOG_VULKANO.md)
 - **!BREAKING CHANGE!** migrates to [winit 0.21](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md)
 - updates the examples to work with the breaking changes
+- expands and corrects overall documentation
+- fixes most links in the documentation
 
 ## 0.0.9 Unclear Passes
 

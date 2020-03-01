@@ -10,6 +10,9 @@
   - splits `swapchain::Swapchain` away from device, it now has to be created and used separately
   - splits `frame::Frame` and `frame::PassInFrame` from the device module
   - splits buffer and image creation into `buffer` and `image` modules
+- **!BREAKING CHANGE!** migrates to [vulkano 0.17](https://github.com/vulkano-rs/vulkano/blob/master/CHANGELOG_VULKANO.md)
+- **!BREAKING CHANGE!** migrates to [winit 0.21](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md)
+- updates the examples to work with the breaking changes
 
 ## 0.0.9 Unclear Passes
 

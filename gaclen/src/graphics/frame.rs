@@ -50,6 +50,7 @@ impl Frame {
 	/// - Locks down the Device for the drawing process (consuming it for the duration of the frame).
 	/// - Acquires the swapchain image to draw to.
 	/// - Creates a CommandBuffer to be recorded for the frame.
+	/// 
 	/// NOTE: that to actually draw, [`Frame::begin_pass()`](struct.Frame.html#method.begin_pass) needs to be called.
 	pub fn begin(
 		mut device: Device,
@@ -85,7 +86,9 @@ impl Frame {
 		Ok(frame)
 	}
 
-	/// Begin a PresentPass (the results will be visible on the screen).
+	/// Begins using a [`GraphicalPass`](struct.GraphicalPass.html).
+	/// 
+	/// Switches the GPU state to use a provided pass' pipeline for drawing.
 	/// 
 	/// # Panic.
 	/// 

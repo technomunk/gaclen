@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.10
+## 0.0.10 Split Libraries
 
 - **!IMPORTANT!** adds initial support for generic attachments
 - **!BREAKING CHANGE!** refactors attachments in `GraphicalPass` creation:

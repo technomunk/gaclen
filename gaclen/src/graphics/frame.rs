@@ -1,4 +1,23 @@
-// TODO/rel: Explain how frames are drawn.
+//! Frames are transient images on the screen and is the core of presenting the game to the user.
+//! 
+//! Drawing frames happens in a few steps, the first one is initializing all the resources necessary:
+//! - A [`Device`](struct.Device.html) that will be drawing the frame.
+//! - One or more instances of [`GraphicalPass`](../pass/struct.GraphicalPass.html) which configure how the device draws.
+//! - Data that is to be drawn (depends highly on the application).
+//! 
+//! Once the above is ready a frame can be drawn:
+//! 1. Begin frame by [`Frame::begin()`](struct.Frame.html#method.begin).
+//! 2. Set up the [`GraphicalPass`](../pass/struct.GraphicalPass.html) to be used by calling [`Frame::begin_pass()`](struct.Frame.html#method.begin_pass).
+//! 3. Invoke one or more [`draw`](struct.PassInFrame.html#method.draw) calls in order to draw the geometry.
+//! 4. End the pass (by calling [`PassInFrame::finish_pass()`](struct.PassInFrame.html#method.finish_pass)).
+//! 5. (optionally) repeat steps 2-4.
+//! 6. Finish the frame by calling [`Frame::finish()`](struct.Frame.html#method.finish).
+//! 
+//! Note that **gaclen** hides some of the underlying mechanisms for ease of use, namely - [command buffers](https://vulkan.lunarg.com/doc/view/1.0.26.0/linux/vkspec.chunked/ch05.html), a core concept in using vulkan effectively.
+//! The `GPU` is technically does not receive any commands until `Frame::finish()` is invoked.
+//! The *draw* calls correspond to recording GPU commands related to drawing given data with given context, but the execution happens completely separately after [`Frame::finish()`](struct.Frame.html#method.finish) is invoked.
+//! Additionally the frame will be presented (shown on the screen) as soon as it's available, depending exactly on the [`Swapchain`](struct.Swapchain.html) being used.
+//! Currently there is no functionality to wait until a frame is drawn or draw a frame without presenting it.
 
 use super::device::Device;
 use super::pass::GraphicalPass;

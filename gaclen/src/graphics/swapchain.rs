@@ -1,4 +1,9 @@
-// TODO/rel: explain swapchains.
+//! [Swapchains](https://vulkan.lunarg.com/doc/view/1.0.26.0/linux/tutorial/html/05-init_swapchain.html) are sets of images that are used to draw and present pictures to the screen and the configuration for how to present them.
+//! 
+//! Main usage for *swapchains* is in [`Frame`](struct.Frame.html) [initialization](struct.Frame.html#method.begin) and they determine the resolution of the image that will be drawn.
+//! To draw an image that will then be presented use [`Swapchain::get_image_for()`](struct.Swapchain.html#method.get_color_image_for) when building the [`Framebuffer`](struct.Framebuffer.html) for a pass that will draw presented results.
+//! 
+//! **Gaclen**'s [`Swapchain`s](struct.Swapchain.html) currently also include [depth buffers](https://en.wikipedia.org/wiki/Z-buffering) that match the size of the image, this functionality however might change in the near future.
 
 use super::ResizeError;
 use super::context::Context;

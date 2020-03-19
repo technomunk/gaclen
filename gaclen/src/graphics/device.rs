@@ -1,22 +1,4 @@
-// TODO/rel: clean up this explanation
-
-//! The device uses GPU to execute rendering and computing commands.
-//! 
-//! In order to get an image using a [Device](struct.Device.html) one needs to:
-//! 1. [Create it](struct.Device.html#method.new).
-//! 2. [Create a render-pass](struct.GraphicalPassBuilder.html).
-//! 3. [Create a data-buffer](struct.Device.html#method.create_cpu_accessible_buffer).
-//! 4. [Start a frame](struct.Device.html#method.start_frame).
-//! 5. [Start a pass](struct.Frame.html#method.begin_pass).
-//! 6. [Draw using a pass](struct.PassInFrame.html#method.draw).
-//! 7. [Finish the pass](struct.PassInFrame.html#method.finish_pass).
-//! 8. Repeat steps `5-7` as necessary.
-//! 9. [Finish the frame](struct.Frame.html#method.finish_frame).
-//! 
-//! Note that the above has 3 states:
-//! - [Device] : normal (default) state, most functionality is available.
-//! - [Frame] : the device is in the middle of drawing a frame, only [starting a pass](struct.Frame.html#method.begin_pass) and [finishing the frame](struct.Frame.html#method.finish_frame) are available.
-//! - [PassInFrame] : the device is in the middle of drawing a frame with a specific setup ([GraphicalPass]). Only the [drawing](struct.PassInFrame.html#method.draw) and [finishing the pass](struct.PassInFrame.html#method.finish_pass) are available.
+//! Device is a logical handle to a hardware-backed instance of a graphical device (typically a GPU).
 
 use super::context::Context;
 

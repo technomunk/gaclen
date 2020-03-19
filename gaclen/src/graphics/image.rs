@@ -1,4 +1,4 @@
-// TODO/rel: explain what image refers to in this case.
+//! Currently **gaclen** simply uses `vulkano` images directly.
 
 use super::device::Device;
 

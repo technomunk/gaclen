@@ -12,5 +12,5 @@
 //! - Members exposes with 'expose-underlying-vulkano' feature use [nightly documentation](https://github.com/rust-lang/rust/issues/43466). The links will be broken.
 //! - The examples use sister-project: [gaclen_shader](https://crates.io/crates/gaclen_shader).
 
-pub mod window;
+pub use winit;
 pub mod graphics;

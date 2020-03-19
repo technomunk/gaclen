@@ -1,4 +1,12 @@
-use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineAbstract, GraphicsPipelineCreationError};
+use vulkano::pipeline::GraphicsPipelineAbstract;
+use crate::graphics;
+use graphics::device::Device;
+use graphics::swapchain::Swapchain;
+use graphics::pass::graphical_pass;
+use graphical_pass::{GraphicalPass, GraphicalRenderPassDescription};
+
+use vulkano::format::{Format, PossibleDepthFormatDesc};
+use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineCreationError};
 use vulkano::pipeline::depth_stencil::{Compare, DepthStencil};
 use vulkano::pipeline::shader::{SpecializationConstants, GraphicsEntryPointAbstract};
 use vulkano::pipeline::raster::{CullMode, FrontFace, PolygonMode, Rasterization};
@@ -6,17 +14,12 @@ use vulkano::pipeline::vertex::{SingleBufferDefinition, VertexDefinition};
 use vulkano::framebuffer::{AttachmentDescription, RenderPassDesc, RenderPassCreationError, Subpass};
 use vulkano::image::ImageLayout;
 
-use crate::graphics;
-use graphics::device::Device;
-use graphics::pass::graphical_pass;
-use graphical_pass::{AttachmentType, GraphicalPass, GraphicalRenderPassDescription};
-
 use std::sync::Arc;
 
 pub use vulkano::pipeline::input_assembly::PrimitiveTopology;
 pub use vulkano::framebuffer::{StoreOp, LoadOp};
 
-/// A structure for initializing [GraphicalPasses](struct.GraphicalPass).
+/// A structure for initializing [`GraphicalPasses`](struct.GraphicalPass.html).
 pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	vertex_input: VI,
 	vertex_shader: (VS, VSS),
@@ -26,13 +29,15 @@ pub struct GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	depth_stencil: DepthStencil,
 
 	samples: u32,
-	attachments: Vec<(AttachmentType, AttachmentDescription)>,
+	attachments: Vec<AttachmentDescription>,
 	depth_attachment: Option<usize>,
 }
 
-/// Error during GraphicalPassBuilder setup.
+/// Error during `GraphicalPassBuilder` setup.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BuilderError {
+pub enum AttachmentError {
+	/// The format supplied cannot be used for requested purposes.
+	InvalidFormat,
 	/// A depth attachment already exists while trying to add one.
 	/// 
 	/// Contains the index of existing attachment.
@@ -42,9 +47,9 @@ pub enum BuilderError {
 /// Error during GraphicalPassBuilder::build.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BuildError {
-	/// Error during creation of a [RenderPass].
+	/// Error during creation of a [`RenderPass`](struct.RenderPass.html).
 	RenderPassCreation(RenderPassCreationError),
-	/// Error during creation of a [GraphicsPipeline].
+	/// Error during creation of a [`GraphicsPipeline`](struct.GraphicsPipeline.html).
 	GraphicsPipelineCreation(GraphicsPipelineCreationError),
 	/// No attachments were added to the pass, therefore no invocation is possible!
 	NoAttachments,
@@ -87,33 +92,33 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// Use a single buffer of provided vertex type as input.
 	pub fn single_buffer_input<V>(self) -> GraphicalPassBuilder<SingleBufferDefinition<V>, VS, VSS, FS, FSS> { self.vertex_input(SingleBufferDefinition::<V>::new()) }
 
-	/// Use given [PrimitiveTopology].
+	/// Use given [`PrimitiveTopology`](enum.PrimitiveTopology.html).
 	/// 
-	/// Default is [PrimitiveTopology::TriangleList].
+	/// Default is [`PrimitiveTopology::TriangleList`](enum.PrimitiveTopology.html#variant.TriangleList).
 	pub fn primitive_topology(self, topology: PrimitiveTopology) -> Self { Self { primitive_topology: topology, .. self } }
-	/// Use [PrimitiveTopology::PointList]. 
+	/// Use [`PrimitiveTopology::PointList`](enum.PrimitiveTopology.html#variant.PointList). 
 	pub fn point_list(self) -> Self { self.primitive_topology(PrimitiveTopology::PointList) }
-	/// Use [PrimitiveTopology::LineList].
+	/// Use [`PrimitiveTopology::LineList`](enum.PrimitiveTopology.html#variant.LineList).
 	pub fn line_list(self) -> Self { self.primitive_topology(PrimitiveTopology::LineList) }
-	/// Use [PrimitiveTopology::LineStrip].
+	/// Use [`PrimitiveTopology::LineStrip`](enum.PrimitiveTopology.html#variant.LineStrip).
 	pub fn line_strip(self) -> Self { self.primitive_topology(PrimitiveTopology::LineStrip) }
-	/// Use [PrimitiveTopology::TriangleList].
+	/// Use [`PrimitiveTopology::TriangleList`](enum.PrimitiveTopology.html#variant.TriangleList).
 	/// 
 	/// This is the default.
 	pub fn triangle_list(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleList) }
-	/// Use [PrimitiveTopology::TriangleStrip].
+	/// Use [`PrimitiveTopology::TriangleStrip`](enum.PrimitiveTopology.html#variant.TriangleStrip).
 	pub fn triangle_strip(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleStrip) }
-	/// Use [PrimitiveTopology::TriangleFan].
+	/// Use [`PrimitiveTopology::TriangleFan`](enum.PrimitiveTopology.html#variant.TriangleFan).
 	pub fn triangle_fan(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleFan) }
-	/// Use [PrimitiveTopology::LineListWithAdjacency].
+	/// Use [`PrimitiveTopology::LineListWithAdjacency`](enum.PrimitiveTopology.html#variant.LineListWithAdjacency).
 	pub fn line_list_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::LineListWithAdjacency) }	
-	/// Use [PrimitiveTopology::LineStripWithAdjacency].
+	/// Use [`PrimitiveTopology::LineStripWithAdjacency`](enum.PrimitiveTopology.html#variant.LineStripWithAdjacency).
 	pub fn line_strip_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::LineStripWithAdjacency) }
-	/// Use [PrimitiveTopology::TriangleListWithAdjacency].
+	/// Use [`PrimitiveTopology::TriangleListWithAdjacency`](enum.PrimitiveTopology.html#variant.TriangleListWithAdjacency).
 	pub fn triangle_list_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleListWithAdjacency) }
-	/// Use [PrimitiveTopology::TriangleStripWithAdjacency].
+	/// Use [`PrimitiveTopology::TriangleStripWithAdjacency`](enum.PrimitiveTopology.html#variant.TriangleStripWithAdjacency).
 	pub fn triangle_strip_with_adjacency(self) -> Self { self.primitive_topology(PrimitiveTopology::TriangleStripWithAdjacency) }
-	/// Use [PrimitiveTopology::PatchList].
+	/// Use [`PrimitiveTopology::PatchList`](enum.PrimitiveTopology.html#variant.PatchList).
 	pub fn patch_list(self, vertices_per_patch: u32) -> Self { self.primitive_topology(PrimitiveTopology::PatchList{ vertices_per_patch }) }
 
 	/// Set whether to clamp depth values of vertices.
@@ -122,7 +127,7 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// If false those vertices will be dropped.
 	pub fn clamp_depth(mut self, clamp: bool) -> Self { self.rasterization.depth_clamp = clamp; self }
 
-	/// Use provided [PolygonMode] for rasterizer (disassemble input primitives into provided types).
+	/// Use provided [`PolygonMode`](enum.PolygonMode.html) for rasterizer (disassemble input primitives into provided types).
 	pub fn raster_polygon_mode(mut self, mode: PolygonMode) -> Self { self.rasterization.polygon_mode = mode; self }
 
 	/// Use provided [CullMode] for rasterizer. Culled faces are dropped before fragment stage.
@@ -138,9 +143,9 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	/// Cull both back and front faces.
 	pub fn cull_front_and_back(self) -> Self { self.cull_mode(CullMode::FrontAndBack) }
 
-	/// Use provided [FrontFace].
+	/// Use provided [`FrontFace`](enum.FrontFace.html).
 	/// 
-	/// Default is [FrontFace::CounterClockwise].
+	/// Default is [`FrontFace::CounterClockwise`](enum.FrontFace.html#CounterClockwise).
 	pub fn front_face(mut self, face: FrontFace) -> Self { self.rasterization.front_face = face; self }
 	/// Set clockwise faces as front.
 	pub fn front_face_clockwise(self) -> Self { self.front_face(FrontFace::Clockwise) }
@@ -235,58 +240,82 @@ impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS> {
 	}
 
 	/// Append an image attachment (resource that is drawn to) to this pass.
-	/// 
-	/// In particular set up the pass to use swapchain image (frame result).
-	pub fn add_attachment_swapchain_image(mut self, device: &Device, load: LoadOp) -> Self {
-		self.attachments.push((AttachmentType::SwapchainImage, AttachmentDescription{
-			format: device.swapchain.format(),
+	pub fn add_image_attachment(mut self, format: Format, load: LoadOp, store: StoreOp) -> Self {
+		self.attachments.push(AttachmentDescription{
+			format,
 			samples: self.samples,
 			load,
-			store: StoreOp::Store,
+			store,
 			stencil_load: LoadOp::DontCare,
 			stencil_store: StoreOp::DontCare,
 			initial_layout: ImageLayout::ColorAttachmentOptimal,
 			final_layout: ImageLayout::ColorAttachmentOptimal,
-		}));
+		});
 		self
 	}
 
 	/// Append an image attachment (resource that is drawn to) to this pass.
 	/// 
-	/// In particular set up the pass to use swapchain depth (z-buffer).
-	pub fn add_attachment_swapchain_depth(mut self, device: &Device, load: LoadOp, store: StoreOp) -> Result<Self, BuilderError> {
-		match self.depth_attachment {
-			Some(index) => Err(BuilderError::DepthAttachmentAlreadyExists(index)),
-			None => {
-				self.depth_attachment = Some(self.attachments.len());
-				self.attachments.push((AttachmentType::SwapchainImage, AttachmentDescription{
-					format: device.swapchain_depth_format,
-					samples: self.samples,
-					load: load,
-					store: store,
-					stencil_load: load,
-					stencil_store: store,
-					initial_layout: ImageLayout::DepthStencilAttachmentOptimal,
-					final_layout: ImageLayout::DepthStencilAttachmentOptimal,
-				}));
-				Ok(self)
-			}
-		}
-	}
-	/// Append an image attachment (resource that is drawn to) to this pass, preserving its contents after the pass.
-	/// 
-	/// In particular set up the pass to use swapchain depth (z-buffer).
-	pub fn add_attachment_swapchain_depth_preserve(self, device: &Device, load: LoadOp) -> Result<Self, BuilderError> {
-		self.add_attachment_swapchain_depth(device, load, StoreOp::Store)
-	}
-	/// Append an image attachment (resource that is drawn to) to this pass, discarding its contents after the pass.
-	/// 
-	/// In particular set up the pass to use swapchain depth (z-buffer).
-	pub fn add_attachment_swapchain_depth_discard(self, device: &Device, load: LoadOp) -> Result<Self, BuilderError> {
-		self.add_attachment_swapchain_depth(device, load, StoreOp::DontCare)
+	/// In particular set up the pass to use swapchain image (frame result) of a device.
+	pub fn add_image_attachment_swapchain(self, swapchain: &Swapchain, load: LoadOp) -> Self {
+		self.add_image_attachment(swapchain.swapchain.format(), load, StoreOp::Store)
 	}
 
-	// TODO: add general attachments
+	/// Append an image attachment (resource that is drawn to) to this pass.
+	/// 
+	/// Shorthand for supplying LoadOp::Clear to add_image_attachment_swapchain.
+	pub fn add_image_attachment_swapchain_cleared(self, swapchain: &Swapchain) -> Self {
+		self.add_image_attachment_swapchain(swapchain, LoadOp::Clear)
+	}
+
+	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
+	/// 
+	/// May fail if a depth attachment was already appended (currently only 1 is supported at a time).
+	pub fn add_depth_attachment(mut self, format: Format, load: LoadOp, store: StoreOp) -> Result<Self, AttachmentError> {
+		if format.is_depth() {
+			match self.depth_attachment {
+				Some(index) => Err(AttachmentError::DepthAttachmentAlreadyExists(index)),
+				None => {
+					self.depth_attachment = Some(self.attachments.len());
+					self.attachments.push(AttachmentDescription{
+						format: format,
+						samples: self.samples,
+						load: load,
+						store: store,
+						stencil_load: load,
+						stencil_store: store,
+						initial_layout: ImageLayout::DepthStencilAttachmentOptimal,
+						final_layout: ImageLayout::DepthStencilAttachmentOptimal,
+					});
+					Ok(self)
+				}
+			}
+		} else {
+			Err(AttachmentError::InvalidFormat)
+		}
+	}
+
+	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
+	/// 
+	/// May fail if a depth attachment was already appended (currently only 1 is supported at a time).
+	/// In particular set up the pass to use swapchain depth of a device.
+	pub fn add_depth_attachment_swapchain(self, swapchain: &Swapchain, load: LoadOp, store: StoreOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment(swapchain.depth_format, load, store)
+	}
+
+	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
+	/// 
+	/// Shorthand for supplying `StoreOp::DontCare` as store parameter to add_depth_attachment_swapchain.
+	pub fn add_depth_attachment_swapchain_discard(self, swapchain: &Swapchain, load: LoadOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment_swapchain(swapchain, load, StoreOp::DontCare)
+	}
+
+	/// Append a depth-buffer attachment (resource that is drawn to) to this pass.
+	/// 
+	/// Shorthand for supplying `StoreOp::Store` as store parameter to add_depth_attachment_swapchain.
+	pub fn add_depth_attachment_swapchain_preserve(self, swapchain: &Swapchain, load: LoadOp) -> Result<Self, AttachmentError> {
+		self.add_depth_attachment_swapchain(swapchain, load, StoreOp::Store)
+	}
 }
 
 impl<VI, VS, VSS, FS, FSS> GraphicalPassBuilder<VI, VS, VSS, FS, FSS>
@@ -300,7 +329,8 @@ where
 	VI : VertexDefinition<VS::InputDefinition> + Send + Sync + 'static,
 {
 	pub fn build(self, device: &Device)
-	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync>, BuildError> {
+	-> Result<GraphicalPass<dyn GraphicsPipelineAbstract + Send + Sync + 'static>, BuildError>
+	{
 		if self.attachments.is_empty() {
 			return Err(BuildError::NoAttachments)
 		};
@@ -321,7 +351,7 @@ where
 			.viewports_dynamic_scissors_irrelevant(1)
 			.fragment_shader(self.fragment_shader.0, self.fragment_shader.1)
 			.depth_stencil(self.depth_stencil)
-			.render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
+			.render_pass(Subpass::from(render_pass, 0).unwrap())
 			.depth_clamp(self.rasterization.depth_clamp)
 			;
 
@@ -348,10 +378,10 @@ where
 				None => builder,
 			};
 
-			Arc::new(builder.build(device.device.clone())?)
+			Arc::new(builder.build(device.logical_device())?)
 		};
 		
-		Ok(GraphicalPass { render_pass, pipeline, })
+		Ok(GraphicalPass { pipeline, })
 	}
 }
 

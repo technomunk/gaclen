@@ -1,15 +1,31 @@
 # Changelog
 
+## 0.0.10 Split Libraries
+
+- **!IMPORTANT!** adds initial support for generic attachments
+- **!BREAKING CHANGE!** refactors attachments in `GraphicalPass` creation:
+  - `add_attachment_*()` are now broken into separate `add_image_attachment()` and `add_depth_attachment()`
+  - swapchain is now just a special case of the above method call
+- **!BREAKING CHANGE!** refactors `Device`, by moving the functionality into relevant modules:
+  - splits `swapchain::Swapchain` away from device, it now has to be created and used separately
+  - splits `frame::Frame` and `frame::PassInFrame` from the device module
+  - splits buffer and image creation into `buffer` and `image` modules
+- **!BREAKING CHANGE!** migrates to [vulkano 0.17](https://github.com/vulkano-rs/vulkano/blob/master/CHANGELOG_VULKANO.md)
+- **!BREAKING CHANGE!** migrates to [winit 0.21](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md)
+- updates the examples to work with the breaking changes
+- expands and corrects overall documentation
+- fixes most links in the documentation
+
 ## 0.0.9 Unclear Passes
 
-- **!IMPORTANT!** refactors `GraphicalPass`:
-  - gets rid of 2 generic parameters (descriptor and present-pass markers)
-  - forces the user to create framebuffers
 - **!IMPORTANT!** adds `GraphicalPassBuilder::add_attachment*()` functionality
   - allows to set user-defined load and store operators
   - unify workflow for using swapchain and user-declared image resources
-- **!IMPORTANT CHANGE!** `GraphicalPassBuilder::build_present_pass()` is now just `GraphicalPassBuilder::build()`
-- **!IMPORTANT CHANGE!** `Frame::begin_pass()` now takes a framebuffer argument
+- **!BREAKING CHANGE!** refactors `GraphicalPass`:
+  - gets rid of 2 generic parameters (descriptor and present-pass markers)
+  - forces the user to create framebuffers
+- **!BREAKING CHANGE!** `GraphicalPassBuilder::build_present_pass()` is now just `GraphicalPassBuilder::build()`
+- **!BREAKING CHANGE!** `Frame::begin_pass()` now takes a framebuffer argument
 - adds `GraphicalPass::begin_framebuffer()` method to start building a framebuffer *(see examples for help)*
 - adds `Frame::get_swapchain_image()` and `Frame::get_swapchain_depth()` accessors to current images for building framebuffers
 - adds `Device::with_depth_format()` constructor for specifying custom swapchain depth format

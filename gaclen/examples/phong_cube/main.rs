@@ -12,11 +12,9 @@ mod geometry;
 
 use gaclen::graphics;
 
-use gaclen::window::{
-	WindowBuilder,
-	EventsLoop,
-	Event, WindowEvent,
-};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event::{Event, WindowEvent};
+use winit::window::WindowBuilder;
 
 use std::sync::Arc;
 
@@ -24,18 +22,19 @@ fn main() {
 	let mut frame_count: u64 = 0;
 	let start_time = std::time::Instant::now();
 
-	let mut events_loop = EventsLoop::new();
+	let event_loop = EventLoop::new();
 	let window = std::sync::Arc::new(
 		WindowBuilder::new()
 			.with_title("Cube example")
-			.with_dimensions((1280, 720).into())
-			.with_min_dimensions((1280, 720).into())
-			.build(&events_loop).unwrap()
+			.with_inner_size(winit::dpi::PhysicalSize::new(1280, 720))
+			.with_min_inner_size(winit::dpi::PhysicalSize::new(1280, 720))
+			.build(&event_loop).unwrap()
 	);
 	
 	let context = graphics::context::Context::new().unwrap();
-	let mut device = graphics::device::Device::new(&context, window.clone(), graphics::device::PresentMode::Immediate).unwrap();
+	let device = graphics::device::Device::new(&context).unwrap();
 	println!("Initialized device: {:?}", device);
+	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::PixelFormat::D16Unorm).expect("Failed to create swapchain!");
 
 	let albedo_pass = {
 		let vs = shaders::vertex::Shader::load(&device).unwrap();
@@ -48,26 +47,26 @@ fn main() {
 			.basic_depth_test()
 			.front_face_clockwise()
 			.cull_back()
-			.add_attachment_swapchain_image(&device, graphics::pass::LoadOp::Clear)
-			.add_attachment_swapchain_depth_discard(&device, graphics::pass::LoadOp::Clear).unwrap()
+			.add_image_attachment_swapchain_cleared(&swapchain)
+			.add_depth_attachment_swapchain_discard(&swapchain, graphics::pass::LoadOp::Clear).unwrap()
 			.build(&device).unwrap()
 	};
 
 	let geometry = geometry::generate_cube(&device).unwrap();
 
-	let transform_buffer_pool = device.create_cpu_buffer_pool::<shaders::vertex::ty::TransformData>(graphics::BufferUsage::all());
-	let light_buffer_pool = device.create_cpu_buffer_pool::<shaders::fragment::ty::LightData>(graphics::BufferUsage::all());
+	let transform_buffer_pool = graphics::buffer::CpuBufferPool::<shaders::vertex::ty::TransformData>::new(device.logical_device(), graphics::buffer::BufferUsage::all());
+	let light_buffer_pool = graphics::buffer::CpuBufferPool::<shaders::fragment::ty::LightData>::new(device.logical_device(), graphics::buffer::BufferUsage::all());
 
 	let texture = {
 		let image = image::open("gaclen/examples/phong_cube/texture.png").unwrap().to_rgba();
 		let (width, height) = image.dimensions();
-        let dimensions = graphics::Dimensions::Dim2d { width, height };
+        let dimensions = graphics::image::Dimensions::Dim2d { width, height };
 		let image_data = image.into_raw(); // to_rgba() returns Vec<u8> backed container
 		
-		device.create_immutable_image_from_iter(image_data.iter().cloned(), dimensions, graphics::PixelFormat::R8G8B8A8Srgb).unwrap()
+		graphics::image::create_immutable_image_from_iter(&device, image_data.iter().cloned(), dimensions, graphics::PixelFormat::R8G8B8A8Srgb).unwrap()
 	};
 
-	let sampler = device.create_simple_linear_repeat_sampler().unwrap();
+	let sampler = graphics::image::Sampler::simple_repeat_linear(device.logical_device());
 	
 	let light = {
 		let data = shaders::fragment::ty::LightData {
@@ -91,86 +90,88 @@ fn main() {
 	let mut last_y = 0;
 	let mut object_rotation = cgmath::Quaternion::new(1.0, 0.0, 0.0, 0.0);
 
-	let mut running = true;
-	while running {
-		if recreate_swapchain {
-			// Sometimes the swapchain fails to create :(
-			match device.resize_for_window(&window) {
-				Ok(()) => (),
-				Err(graphics::ResizeError::Swapchain(_)) => {
-					println!("Failed to resize window, skipping frame!");
-					continue;
-				},
-				Err(err) => panic!(err),
-			};
-			recreate_swapchain = false;
-		}
+	// Wrap the device in a stack-allocated container to allow for temporary ownership.
+	let mut device = Some(device);
 
-		let clear_color = [0.0, 0.0, 0.0, 1.0];
-
-		let transform = {
-			let data = transform(object_rotation.clone(), window.get_inner_size().unwrap().into());
-			transform_buffer_pool.next(data).unwrap()
-		};
-
-		let transform_descriptor_set = Arc::new(albedo_pass.start_persistent_descriptor_set(0)
-			.add_buffer(transform).unwrap()
-			.build().unwrap());
-
-		let frame = device.begin_frame().unwrap();
-
-		let framebuffer = std::sync::Arc::new(albedo_pass.start_framebuffer()
-			.add(frame.get_swapchain_image()).unwrap()
-			.add(frame.get_swapchain_depth()).unwrap()
-			.build().unwrap()
-		);
-
-		let after_frame = frame.begin_pass(&albedo_pass, framebuffer, vec![clear_color.into(), 1f32.into()])
-			.draw(vec![geometry.clone()], (transform_descriptor_set, light_descriptor_set.clone()), ())
-			.finish_pass()
-		.finish_frame();
-		
-		device = match after_frame {
-			Ok(device) => device,
-			Err((device, err)) => {
-				if err == graphics::device::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
-				device
+	event_loop.run(move |event, _, control_flow| {
+		match event {
+			Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+				*control_flow = ControlFlow::Exit;
+				let run_duration = start_time.elapsed().as_secs_f64();
+				let fps: f64 = frame_count as f64 / run_duration;
+				println!("Produced {} frames over {:.2} seconds ({:.2} avg fps)", frame_count, run_duration, fps);
 			},
-		};
-
-		frame_count += 1;
-
-		events_loop.poll_events(|event| {
-			match event {
-				Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => running = false,
-				Event::WindowEvent { event: WindowEvent::Resized(_), .. } => recreate_swapchain = true,
-				Event::WindowEvent { event: WindowEvent::MouseInput{state, button, .. }, .. } => {
-					rotation_enabled = (button == gaclen::window::MouseButton::Right) && state == gaclen::window::ElementState::Pressed;
-
-				}
-				Event::WindowEvent { event: WindowEvent::CursorMoved{ position, .. }, .. } => {
-					let (x, y) = position.into();
-					
-					if rotation_enabled {
-						let (width, height) : (f64, f64) = window.get_inner_size().unwrap().into();
-						let delta_x = (x as f32 - last_x as f32) / width as f32;
-						let delta_y = (y as f32 - last_y as f32) / height as f32;
-						let delta : cgmath::Quaternion<_> = cgmath::Euler::new(cgmath::Rad(0.0), cgmath::Rad(delta_y), -cgmath::Rad(delta_x)).into();
-						object_rotation = delta * object_rotation;
-					}
-
-					last_x = x;
-					last_y = y;
-				}
-				_ => ()
+			Event::WindowEvent { event: WindowEvent::Resized(_), .. } => recreate_swapchain = true,
+			Event::WindowEvent { event: WindowEvent::MouseInput{state, button, .. }, .. } => {
+				rotation_enabled = (button == winit::event::MouseButton::Right) && state == winit::event::ElementState::Pressed;
 			}
-		});
-	}
+			Event::WindowEvent { event: WindowEvent::CursorMoved{ position, .. }, .. } => {
+				let (x, y) = position.into();
+				
+				if rotation_enabled {
+					let (width, height) : (f64, f64) = window.inner_size().into();
+					let delta_x = (x as f32 - last_x as f32) / width as f32;
+					let delta_y = (y as f32 - last_y as f32) / height as f32;
+					let delta : cgmath::Quaternion<_> = cgmath::Euler::new(cgmath::Rad(0.0), cgmath::Rad(delta_y), -cgmath::Rad(delta_x)).into();
+					object_rotation = delta * object_rotation;
+				}
 
-	let run_duration = start_time.elapsed().as_secs_f64();
-	let fps: f64 = frame_count as f64 / run_duration;
-
-	println!("Produced {} frames over {:.2} seconds ({:.2} avg fps)", frame_count, run_duration, fps);
+				last_x = x;
+				last_y = y;
+			},
+			Event::RedrawEventsCleared => {
+				if recreate_swapchain {
+					let dimensions = window.inner_size();
+					match swapchain.resize(dimensions.into()) {
+						Ok(()) => (),
+						Err(graphics::ResizeError::Swapchain(_)) => {
+							println!("Failed to resize window, skipping frame!");
+							return;
+						},
+						Err(err) => panic!(err),
+					};
+					recreate_swapchain = false;
+				}
+		
+				let clear_color = [0.0, 0.0, 0.0, 1.0];
+		
+				let transform = {
+					let data = transform(object_rotation.clone(), window.inner_size().into());
+					transform_buffer_pool.next(data).unwrap()
+				};
+		
+				let transform_descriptor_set = Arc::new(albedo_pass.start_persistent_descriptor_set(0)
+					.add_buffer(transform).unwrap()
+					.build().unwrap());
+		
+				// Device ownership is taken here.
+				let frame = graphics::frame::Frame::begin(device.take().unwrap(), &swapchain).unwrap();
+		
+				let framebuffer = std::sync::Arc::new(albedo_pass.start_framebuffer()
+					.add(swapchain.get_color_image_for(&frame)).unwrap()
+					.add(swapchain.get_depth_image_for(&frame)).unwrap()
+					.build().unwrap()
+				);
+		
+				let after_frame = frame.begin_pass(&albedo_pass, framebuffer, vec![clear_color.into(), 1f32.into()])
+					.draw(vec![geometry.clone()], (transform_descriptor_set, light_descriptor_set.clone()), ())
+					.finish_pass()
+				.finish();
+				
+				// Return device.
+				device = match after_frame {
+					Ok(device) => Some(device),
+					Err((device, err)) => {
+						if err == graphics::frame::FrameFinishError::Flush(gaclen::graphics::vulkano::sync::FlushError::OutOfDate) { recreate_swapchain = true; };
+						Some(device)
+					},
+				};
+		
+				frame_count += 1;
+			},
+			_ => ()
+		}
+	});
 }
 
 // Ideally the view and projection matrices would be found by some 'Camera' concept.

@@ -1,22 +1,17 @@
 use super::builder::GraphicalPassBuilder;
 
+use vulkano::descriptor::PipelineLayoutAbstract;
 use vulkano::descriptor::descriptor_set::{PersistentDescriptorSet, PersistentDescriptorSetBuilder};
 use vulkano::format::ClearValue;
 use vulkano::framebuffer::{Framebuffer, FramebufferBuilder};
-use vulkano::framebuffer::{AttachmentDescription, PassDescription, RenderPass, RenderPassDesc, RenderPassDescClearValues, PassDependencyDescription};
+use vulkano::framebuffer::{AttachmentDescription, PassDescription, RenderPassDesc, RenderPassDescClearValues, PassDependencyDescription};
 use vulkano::image::ImageLayout;
-use vulkano::pipeline::GraphicsPipelineAbstract;
 
 use std::sync::Arc;
 
 /// A GraphicalPass defines the device configuration used to execute draw commands.
-/// 
-/// There are 2 types of GraphicalPasses:
-/// - **Internal** - the results of which are used by later passes, for example: shadow passes.
-/// - **Present** - the results of which are visible on the screen, for example: final post-process, simple albedo.
-pub struct GraphicalPass<P: ?Sized> {
+pub struct GraphicalPass<P : ?Sized> {
 	pub(in crate::graphics) pipeline: Arc<P>,
-	pub(in crate::graphics) render_pass: Arc<RenderPass<GraphicalRenderPassDescription>>,
 }
 
 impl GraphicalPass<()> {
@@ -24,32 +19,28 @@ impl GraphicalPass<()> {
 	pub fn start() -> GraphicalPassBuilder<(), (), (), (), ()> { GraphicalPassBuilder::new() }
 }
 
-impl<P> GraphicalPass<P>
-where
-	P : GraphicsPipelineAbstract + Send + Sync + ?Sized,
+impl<P : ?Sized> GraphicalPass<P>
 {
 	/// Start building a new persistent descriptor set.
-	pub fn start_persistent_descriptor_set(&self, index: usize) -> PersistentDescriptorSetBuilder<Arc<P>, ()> {
-		PersistentDescriptorSet::start(self.pipeline.clone(), index)
+	pub fn start_persistent_descriptor_set(&self, index: usize) -> PersistentDescriptorSetBuilder<()>
+	where
+		P : PipelineLayoutAbstract,
+	{
+		PersistentDescriptorSet::start(self.pipeline.descriptor_set_layout(index).unwrap().clone())
 	}
 
 	/// Start building a framebuffer for this pass.
-	pub fn start_framebuffer(&self) -> FramebufferBuilder<Arc<RenderPass<GraphicalRenderPassDescription>>, ()> {
-		Framebuffer::start(self.render_pass.clone())
+	pub fn start_framebuffer(&self) -> FramebufferBuilder<Arc<P>, ()> {
+		Framebuffer::start(self.pipeline.clone())
 	}
 }
 
-pub struct GraphicalRenderPassDescription {
+#[derive(Debug, Clone)]
+pub(in crate::graphics) struct GraphicalRenderPassDescription {
 	/// Image attachments of the render pass.
-	pub attachments: Vec<(AttachmentType, AttachmentDescription)>,
+	pub attachments: Vec<AttachmentDescription>,
 	/// Depth stencil attachment index.
 	pub depth_attachment: Option<usize>,
-}
-
-pub enum AttachmentType {
-	SwapchainImage,
-	SwapchainDepth,
-	General,
 }
 
 unsafe impl RenderPassDesc for GraphicalRenderPassDescription {
@@ -59,7 +50,7 @@ unsafe impl RenderPassDesc for GraphicalRenderPassDescription {
 	#[inline]
 	fn attachment_desc(&self, num: usize) -> Option<AttachmentDescription> {
 		match num < self.attachments.len() {
-			true => Some(self.attachments[num].1.clone()),
+			true => Some(self.attachments[num].clone()),
 			false => None,
 		}
 	}

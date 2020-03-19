@@ -2,13 +2,7 @@
 //! 
 //! The changes include tweaks to the generated code to use gaclen::vulkano to avoid the necessity of including vulkano in gaclen-dependent projects.
 
-// Copyright (c) 2016 The vulkano developers
-// Licensed under the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>,
-// All files in the project carrying such
-// notice may not be copied, modified, or distributed except
-// according to those terms.
-
+#![recursion_limit = "1024"]
 #[macro_use]
 extern crate quote;
 #[macro_use]
@@ -190,6 +184,10 @@ pub fn shader(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         full_include_path
     }).collect::<Vec<_>>();
 
-    let content = codegen::compile(path, &root_path, &source_code, input.shader_kind, &include_paths, &input.macro_defines).unwrap();
+    let content = match codegen::compile(path, &root_path, &source_code, input.shader_kind, &include_paths, &input.macro_defines) {
+        Ok(ok) => ok,
+        Err(e) => panic!(e.replace("(s): ", "(s):\n"))
+    };
+
     codegen::reflect("Shader", content.as_binary(), input.dump).unwrap().into()
 }

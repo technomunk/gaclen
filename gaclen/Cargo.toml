@@ -1,6 +1,6 @@
 [package]
 name = "gaclen"
-version = "0.0.9"
+version = "0.0.10"
 authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
 edition = "2018"
 
@@ -19,11 +19,11 @@ default = []
 expose-underlying-vulkano = []
 
 [dependencies]
-winit = "0.19.0" # window handling
-vulkano = "0.16.0" # vulkan library in Rust
-vulkano-win = "0.16.0" # vulkan-winit linkage
+winit = "0.21.0" # window handling
+vulkano = "0.17.0" # vulkan library in Rust
+vulkano-win = "0.17.0" # vulkan-winit linkage
 
 [dev-dependencies]
 cgmath = "0.17.0" # linear algebra library
 image = "0.22.3"
-gaclen_shader = { path = "../gaclen_shader", version = "0.0.9" }
+gaclen_shader = { path = "../gaclen_shader", version = "0.0.10" }

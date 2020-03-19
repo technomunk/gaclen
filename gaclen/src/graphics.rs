@@ -4,18 +4,19 @@
 //! 
 //! The graphical workflow is extensive, please refer to [examples](https://github.com/Griffone/gaclen/tree/master/examples) for help.
 
+pub mod buffer;
 pub mod context;
 pub mod device;
+pub mod frame;
+pub mod image;
 pub mod pass;
+pub mod swapchain;
 
 /// used for hardware acceleration.
 pub use vulkano;
 pub use vulkano::impl_vertex;
-pub use vulkano::buffer::BufferUsage;
 pub use vulkano::format::Format as PixelFormat;
-pub use vulkano::image::Dimensions;
 pub use vulkano::instance::Version;
-pub use vulkano::sampler::{Filter as TextureFilter, SamplerAddressMode, MipmapMode};
 
 const REQUIRED_VULKAN_VERSION: Version = Version { major: 1, minor: 0, patch: 0 };
 const ENGINE_NAME: &str = "gaclen";
@@ -25,9 +26,9 @@ const ENGINE_VERSION: Version = Version { major: 0, minor: 0, patch: 0 };
 /// Error during resizing of viewports.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResizeError {
-	/// Error during recreation of the [Device](struct.Device) swapchain.
+	/// Error during recreation of the [`Swapchain`](struct.Swapchain.html).
 	Swapchain(vulkano::swapchain::SwapchainCreationError),
-	/// Error during recreation of depth image of the [Device](struct.Device) swapchain.
+	/// Error during recreation of depth image of the [`Swapchain`](struct.Swapchain.html).
 	Image(vulkano::image::ImageCreationError),
 	/// The window provided has no apparent size.
 	UnsizedWindow,

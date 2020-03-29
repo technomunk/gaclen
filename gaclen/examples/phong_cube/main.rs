@@ -94,6 +94,7 @@ fn main() {
 	let mut device = Some(device);
 
 	event_loop.run(move |event, _, control_flow| {
+		*control_flow = ControlFlow::Poll;
 		match event {
 			Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
 				*control_flow = ControlFlow::Exit;

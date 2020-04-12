@@ -27,6 +27,8 @@ use winit::window::Window;
 
 use std::sync::Arc;
 
+pub use vulkano::pipeline::viewport::Viewport;
+
 use vulkano::buffer::{BufferAccess, TypedBufferAccess};
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
 use vulkano::descriptor::descriptor_set::DescriptorSetsCollection;
@@ -43,6 +45,7 @@ pub struct Frame {
 	pub(super) swapchain: Arc<VlkSwapchain<Arc<Window>>>,
 	pub(super) time: Box<dyn GpuFuture>,
 	pub(super) dynamic_state: DynamicState,
+	pub(super) default_viewports: Option<Vec<Viewport>>,
 	pub(super) commands: AutoCommandBufferBuilder,
 	// index of the frame in the swapchain
 	pub(super) swapchain_index: usize,
@@ -98,6 +101,7 @@ impl Frame {
 			device,
 			swapchain: used_swapchain,
 			dynamic_state: swapchain.dynamic_state.clone(),
+			default_viewports: swapchain.dynamic_state.viewports.clone(),
 			time,
 			commands,
 			swapchain_index,
@@ -112,7 +116,7 @@ impl Frame {
 	/// # Panic.
 	/// 
 	/// - Panics if fails to begin the [renderpass](https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch07.html) command.
-	pub fn begin_pass<'a, P : ?Sized, F>(
+	pub fn begin_pass<'a, P: ?Sized, F>(
 		mut self,
 		pass: &'a GraphicalPass<P>,
 		framebuffer: F,
@@ -124,6 +128,27 @@ impl Frame {
 		// TODO: build framebuffer automatically, using GraphicalRenderPassDescriptor information
 
 		self.commands = self.commands.begin_render_pass(framebuffer, false, clear_values).unwrap();
+		self.dynamic_state.viewports = self.default_viewports.clone();
+
+		PassInFrame {
+			frame: self,
+			pass: pass,
+		}
+	}
+
+	/// Like [`begin_pass()`](struct.Frame.html#method.begin_pass), but providing a custom viewport for a render-pass.
+	pub fn begin_pass_with_viewport<'a, P: ?Sized, F>(
+		mut self,
+		pass: &'a GraphicalPass<P>,
+		framebuffer: F,
+		clear_values: Vec<vulkano::format::ClearValue>,
+		viewport: Viewport)
+	-> PassInFrame<'a, P>
+	where
+		F : FramebufferAbstract + Send + Sync + Clone + 'static,
+	{
+		self.commands = self.commands.begin_render_pass(framebuffer, false, clear_values).unwrap();
+		self.dynamic_state.viewports = Some(vec![viewport]);
 
 		PassInFrame {
 			frame: self,

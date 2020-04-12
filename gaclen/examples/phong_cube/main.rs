@@ -34,7 +34,7 @@ fn main() {
 	let context = graphics::context::Context::new().unwrap();
 	let device = graphics::device::Device::new(&context).unwrap();
 	println!("Initialized device: {:?}", device);
-	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::PixelFormat::D16Unorm).expect("Failed to create swapchain!");
+	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::image::Format::D16Unorm).expect("Failed to create swapchain!");
 
 	let albedo_pass = {
 		let vs = shaders::vertex::Shader::load(&device).unwrap();
@@ -63,7 +63,7 @@ fn main() {
         let dimensions = graphics::image::Dimensions::Dim2d { width, height };
 		let image_data = image.into_raw(); // to_rgba() returns Vec<u8> backed container
 		
-		graphics::image::create_immutable_image_from_iter(&device, image_data.iter().cloned(), dimensions, graphics::PixelFormat::R8G8B8A8Srgb).unwrap()
+		graphics::image::create_immutable_image_from_iter(&device, image_data.iter().cloned(), dimensions, graphics::image::Format::R8G8B8A8Srgb).unwrap()
 	};
 
 	let sampler = graphics::image::Sampler::simple_repeat_linear(device.logical_device());
@@ -176,8 +176,8 @@ fn main() {
 }
 
 // Ideally the view and projection matrices would be found by some 'Camera' concept.
-fn transform(rotation: cgmath::Quaternion<f32>, window_resolution: (u32, u32)) -> shaders::vertex::ty::TransformData {
-	let aspect = window_resolution.0 as f32 / window_resolution.1 as f32;
+fn transform(rotation: cgmath::Quaternion<f32>, viewport_dimensions: (u32, u32)) -> shaders::vertex::ty::TransformData {
+	let aspect = viewport_dimensions.0 as f32 / viewport_dimensions.1 as f32;
 
 	let model: cgmath::Matrix4<f32> = rotation.into();
 	let proj: cgmath::Matrix4<f32> = cgmath::PerspectiveFov { fovy: cgmath::Deg(40.0).into(), aspect, near: 0.1, far: 4.0 }.into();

@@ -5,10 +5,12 @@ use super::device::Device;
 use std::sync::Arc;
 
 use vulkano::sync::GpuFuture;
-use vulkano::format::{AcceptsPixels, Format, FormatDesc};
+use vulkano::format::{AcceptsPixels, FormatDesc};
 
-pub use vulkano::image::{Dimensions, ImmutableImage, ImageCreationError};
-pub use vulkano::sampler::{Filter, Sampler, SamplerCreationError, SamplerAddressMode, MipmapMode};
+pub use vulkano::format::{Format};
+pub use vulkano::image::{AttachmentImage, Dimensions, ImmutableImage, ImageCreationError};
+pub use vulkano::sampler::{BorderColor, Filter, Sampler, SamplerCreationError, SamplerAddressMode, MipmapMode};
+pub use vulkano::pipeline::depth_stencil::Compare;
 
 /// Create an [`ImmutableImage`](struct.ImmutableImage.html) from a data iterator.
 /// 

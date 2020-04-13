@@ -38,6 +38,7 @@ pub struct Swapchain {
 	pub(super) inverse_depth: bool,
 
 	pub(super) dynamic_state: DynamicState,
+	pub(super) default_viewport: Viewport,
 }
 
 /// An error during the creation of a [`Swapchain`](struct.Swapchain.html).
@@ -82,18 +83,19 @@ impl Swapchain {
 			images
 		};
 
-		let mut dynamic_state = DynamicState::default();
-		resize_dynamic_state_viewport(&mut dynamic_state, dimensions, false);
-
-		Ok(Swapchain {
+		let mut result = Swapchain{
 			device: logical_device,
 			swapchain,
 			images,
 			depths,
 			depth_format,
 			inverse_depth: false,
-			dynamic_state,
-		})
+			dynamic_state: DynamicState::default(),
+			default_viewport: Viewport{ origin: [0f32; 2], dimensions: [0f32; 2], depth_range: 0f32..1f32 },
+		};
+		result.resize_viewport(dimensions);
+
+		Ok(result)
 	}
 
 	/// Set the depth buffer to use forward (inverse == false) or inverse range.
@@ -107,12 +109,12 @@ impl Swapchain {
 			let dimensions = self.depths[0].dimensions();
 			(dimensions[0], dimensions[1])
 		};
-		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, inverse);
+		self.resize_viewport(dimensions);
 	}
 
 	/// Resize the images in the swapchain to provided size.
 	pub fn resize(&mut self, dimensions: (u32, u32)) -> Result<(), ResizeError> {
-		resize_dynamic_state_viewport(&mut self.dynamic_state, dimensions, self.inverse_depth);
+		self.resize_viewport(dimensions);
 
 		// TODO: investigate weird UnsupportedDimensions swapchain error on some resizes
 		let (swapchain, images) = self.swapchain.recreate_with_dimensions([dimensions.0, dimensions.1])?;
@@ -139,6 +141,32 @@ impl Swapchain {
 	/// Get the target depth image to draw to for provided frame.
 	pub fn get_depth_image_for(&self, frame: &Frame) -> Arc<AttachmentImage> {
 		self.depths[frame.swapchain_index].clone()
+	}
+
+	/// Get the default viewport for rendering to this swapchain.
+	pub fn default_viewport(&self) -> Viewport {
+		self.default_viewport.clone()
+	}
+
+	fn resize_viewport(&mut self, dimensions: (u32, u32)) {
+		self.default_viewport = {
+			let origin = [0f32; 2];
+			let dimensions = [dimensions.0 as f32, dimensions.1 as f32];
+			let depth_range = match self.inverse_depth {
+				true => 1f32..0f32,
+				false => 0f32..1f32,
+			};
+			Viewport{ origin, dimensions, depth_range }
+		};
+		match self.dynamic_state.viewports {
+			Some(ref mut vec) => {
+				match vec.len() {
+					0 => vec.push(self.default_viewport.clone()),
+					_ => vec[0] = self.default_viewport.clone(),
+				}
+			},
+			None => self.dynamic_state.viewports = Some(vec![self.default_viewport.clone()]),
+		};
 	}
 }
 
@@ -204,22 +232,4 @@ fn select_format(formats: Vec<ImageFormat>) -> Result<ImageFormat, SwapchainCrea
 fn choose_better_format(first: ImageFormat, _second: ImageFormat) -> ImageFormat {
 	// TODO: compare and select better format
 	first
-}
-
-fn resize_dynamic_state_viewport(dynamic_state: &mut DynamicState, dimensions: (u32, u32), inverse: bool) {
-	let viewport = Viewport {
-		origin: [0.0, 0.0],
-		dimensions: [dimensions.0 as f32, dimensions.1 as f32],
-		depth_range: if inverse { 1.0 .. 0.0 } else { 0.0 .. 1.0 },
-	};
-	
-	match dynamic_state.viewports {
-		Some(ref mut vec) => {
-			match vec.len() {
-				0 => vec.push(viewport),
-				_ => vec[0] = viewport,
-			}
-		},
-		None => dynamic_state.viewports = Some(vec![viewport]),
-	};
 }

@@ -45,7 +45,6 @@ pub struct Frame {
 	pub(super) swapchain: Arc<VlkSwapchain<Arc<Window>>>,
 	pub(super) time: Box<dyn GpuFuture>,
 	pub(super) dynamic_state: DynamicState,
-	pub(super) default_viewports: Option<Vec<Viewport>>,
 	pub(super) commands: AutoCommandBufferBuilder,
 	// index of the frame in the swapchain
 	pub(super) swapchain_index: usize,
@@ -101,7 +100,6 @@ impl Frame {
 			device,
 			swapchain: used_swapchain,
 			dynamic_state: swapchain.dynamic_state.clone(),
-			default_viewports: swapchain.dynamic_state.viewports.clone(),
 			time,
 			commands,
 			swapchain_index,
@@ -120,6 +118,7 @@ impl Frame {
 		mut self,
 		pass: &'a GraphicalPass<P>,
 		framebuffer: F,
+		viewport: Viewport,
 		clear_values: Vec<vulkano::format::ClearValue>)
 	-> PassInFrame<'a, P>
 	where
@@ -127,26 +126,6 @@ impl Frame {
 	{
 		// TODO: build framebuffer automatically, using GraphicalRenderPassDescriptor information
 
-		self.commands = self.commands.begin_render_pass(framebuffer, false, clear_values).unwrap();
-		self.dynamic_state.viewports = self.default_viewports.clone();
-
-		PassInFrame {
-			frame: self,
-			pass: pass,
-		}
-	}
-
-	/// Like [`begin_pass()`](struct.Frame.html#method.begin_pass), but providing a custom viewport for a render-pass.
-	pub fn begin_pass_with_viewport<'a, P: ?Sized, F>(
-		mut self,
-		pass: &'a GraphicalPass<P>,
-		framebuffer: F,
-		clear_values: Vec<vulkano::format::ClearValue>,
-		viewport: Viewport)
-	-> PassInFrame<'a, P>
-	where
-		F : FramebufferAbstract + Send + Sync + Clone + 'static,
-	{
 		self.commands = self.commands.begin_render_pass(framebuffer, false, clear_values).unwrap();
 		self.dynamic_state.viewports = Some(vec![viewport]);
 

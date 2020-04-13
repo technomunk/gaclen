@@ -37,7 +37,7 @@ fn main() {
 	let context = graphics::context::Context::new().unwrap();
 	let device = graphics::device::Device::new(&context).unwrap();
 	println!("Initialized device: {:?}", device);
-	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::PixelFormat::D16Unorm).expect("Failed to create swapchain!");
+	let mut swapchain = graphics::swapchain::Swapchain::new(&context, &device, window.clone(), graphics::swapchain::PresentMode::Immediate, graphics::image::Format::D16Unorm).expect("Failed to create swapchain!");
 
 	let pass = {
 		let vs = shaders::vertex::Shader::load(&device).unwrap();
@@ -52,15 +52,20 @@ fn main() {
 			.build(&device).unwrap()
 	};
 
-	let triangle_buffer = graphics::buffer::CpuAccessibleBuffer::from_iter(device.logical_device(), graphics::buffer::BufferUsage::all(), false, [
-		Vertex { position: [-0.5, 0.5, 0.0 ], color: [ 0.25, 0.75, 0.25, 1.0 ] },
-		Vertex { position: [ 0.5,-0.5, 0.0 ], color: [ 0.75, 0.25, 0.25, 1.0 ] },
-		Vertex { position: [ 0.5, 0.5, 0.0 ], color: [ 0.75, 0.75, 0.25, 0.0 ] },
+	let triangle_buffer = graphics::buffer::CpuAccessibleBuffer::from_data(
+		device.logical_device(),
+		graphics::buffer::BufferUsage::all(),
+		false,
+		[
+			Vertex { position: [-0.5, 0.5, 0.0 ], color: [ 0.25, 0.75, 0.25, 1.0 ] },
+			Vertex { position: [ 0.5,-0.5, 0.0 ], color: [ 0.75, 0.25, 0.25, 1.0 ] },
+			Vertex { position: [ 0.5, 0.5, 0.0 ], color: [ 0.75, 0.75, 0.25, 0.0 ] },
 
-		Vertex { position: [-0.5,-0.5, 0.0 ], color: [ 0.0, 0.0, 0.0, 1.0 ] },
-		Vertex { position: [ 0.5,-0.5, 0.0 ], color: [ 1.0, 0.0, 0.0, 1.0 ] },
-		Vertex { position: [-0.5, 0.5, 0.0 ], color: [ 0.0, 1.0, 0.0, 1.0 ] },
-	].iter().cloned()).unwrap();
+			Vertex { position: [-0.5,-0.5, 0.0 ], color: [ 0.0, 0.0, 0.0, 1.0 ] },
+			Vertex { position: [ 0.5,-0.5, 0.0 ], color: [ 1.0, 0.0, 0.0, 1.0 ] },
+			Vertex { position: [-0.5, 0.5, 0.0 ], color: [ 0.0, 1.0, 0.0, 1.0 ] },
+		]
+	).unwrap();
 
 	let mut recreate_swapchain = false;
 
@@ -103,7 +108,7 @@ fn main() {
 					.build().unwrap()
 				);
 		
-				let after_frame = frame.begin_pass(&pass, framebuffer, vec![clear_color.into(), 1.0f32.into()])
+				let after_frame = frame.begin_pass(&pass, framebuffer, swapchain.default_viewport(), vec![clear_color.into(), 1.0f32.into()])
 					.draw(vec![triangle_buffer.clone()], (), push_constants)
 					.finish_pass()
 				.finish();

@@ -12,6 +12,8 @@ mod geometry;
 
 use gaclen::graphics;
 
+use cgmath::One;
+
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::event::{Event, WindowEvent};
 use winit::window::WindowBuilder;
@@ -81,14 +83,15 @@ fn main() {
 	let light_descriptor_set = Arc::new(albedo_pass.start_persistent_descriptor_set(1)
 		.add_buffer(light).unwrap()
 		.add_sampled_image(texture, sampler).unwrap()
-		.build().unwrap());
+		.build().unwrap()
+	);
 
 	let mut recreate_swapchain = false;
 
 	let mut rotation_enabled = false;
 	let mut last_x = 0;
 	let mut last_y = 0;
-	let mut object_rotation = cgmath::Quaternion::new(1.0, 0.0, 0.0, 0.0);
+	let mut object_rotation = cgmath::Quaternion::one();
 
 	// Wrap the device in a stack-allocated container to allow for temporary ownership.
 	let mut device = Some(device);
@@ -143,7 +146,8 @@ fn main() {
 		
 				let transform_descriptor_set = Arc::new(albedo_pass.start_persistent_descriptor_set(0)
 					.add_buffer(transform).unwrap()
-					.build().unwrap());
+					.build().unwrap()
+				);
 		
 				// Device ownership is taken here.
 				let frame = graphics::frame::Frame::begin(device.take().unwrap(), &swapchain).unwrap();
@@ -154,7 +158,7 @@ fn main() {
 					.build().unwrap()
 				);
 		
-				let after_frame = frame.begin_pass(&albedo_pass, framebuffer, vec![clear_color.into(), 1f32.into()])
+				let after_frame = frame.begin_pass(&albedo_pass, framebuffer, swapchain.default_viewport(), vec![clear_color.into(), 1f32.into()])
 					.draw(vec![geometry.clone()], (transform_descriptor_set, light_descriptor_set.clone()), ())
 					.finish_pass()
 				.finish();

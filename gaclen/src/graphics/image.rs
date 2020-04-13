@@ -10,7 +10,7 @@ use vulkano::format::{AcceptsPixels, FormatDesc};
 pub use vulkano::format::{Format};
 pub use vulkano::image::{AttachmentImage, Dimensions, ImmutableImage, ImageCreationError};
 pub use vulkano::sampler::{BorderColor, Filter, Sampler, SamplerCreationError, SamplerAddressMode, MipmapMode};
-pub use vulkano::pipeline::depth_stencil::Compare;
+pub use vulkano::pipeline::depth_stencil::Compare as CompareOp;
 
 /// Create an [`ImmutableImage`](struct.ImmutableImage.html) from a data iterator.
 /// 

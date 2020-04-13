@@ -1,7 +1,7 @@
 use super::builder::GraphicalPassBuilder;
 
 use vulkano::descriptor::PipelineLayoutAbstract;
-use vulkano::descriptor::descriptor_set::{PersistentDescriptorSet, PersistentDescriptorSetBuilder};
+use vulkano::descriptor::descriptor_set::{FixedSizeDescriptorSetsPool, PersistentDescriptorSet, PersistentDescriptorSetBuilder};
 use vulkano::format::ClearValue;
 use vulkano::framebuffer::{Framebuffer, FramebufferBuilder};
 use vulkano::framebuffer::{AttachmentDescription, PassDescription, RenderPassDesc, RenderPassDescClearValues, PassDependencyDescription};
@@ -22,11 +22,27 @@ impl GraphicalPass<()> {
 impl<P : ?Sized> GraphicalPass<P>
 {
 	/// Start building a new persistent descriptor set.
+	/// 
+	/// # Panic
+	/// 
+	/// Panics if the pipeline does not expect a descriptor set at given index.
 	pub fn start_persistent_descriptor_set(&self, index: usize) -> PersistentDescriptorSetBuilder<()>
 	where
 		P : PipelineLayoutAbstract,
 	{
 		PersistentDescriptorSet::start(self.pipeline.descriptor_set_layout(index).unwrap().clone())
+	}
+
+	/// Allocate a pool of fixed-size descriptor sets.
+	/// 
+	/// # Panic
+	/// 
+	/// Panics if the pipeline does not expect a descriptor set at given index.
+	pub fn create_fixed_size_descriptor_set_pool(&self, index: usize) -> FixedSizeDescriptorSetsPool
+	where
+		P : PipelineLayoutAbstract,
+	{
+		FixedSizeDescriptorSetsPool::new(self.pipeline.descriptor_set_layout(index).unwrap().clone())
 	}
 
 	/// Start building a framebuffer for this pass.

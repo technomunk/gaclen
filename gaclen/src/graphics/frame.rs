@@ -27,6 +27,8 @@ use winit::window::Window;
 
 use std::sync::Arc;
 
+pub use vulkano::pipeline::viewport::Viewport;
+
 use vulkano::buffer::{BufferAccess, TypedBufferAccess};
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, DynamicState};
 use vulkano::descriptor::descriptor_set::DescriptorSetsCollection;
@@ -112,10 +114,11 @@ impl Frame {
 	/// # Panic.
 	/// 
 	/// - Panics if fails to begin the [renderpass](https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch07.html) command.
-	pub fn begin_pass<'a, P : ?Sized, F>(
+	pub fn begin_pass<'a, P: ?Sized, F>(
 		mut self,
 		pass: &'a GraphicalPass<P>,
 		framebuffer: F,
+		viewport: Viewport,
 		clear_values: Vec<vulkano::format::ClearValue>)
 	-> PassInFrame<'a, P>
 	where
@@ -124,6 +127,7 @@ impl Frame {
 		// TODO: build framebuffer automatically, using GraphicalRenderPassDescriptor information
 
 		self.commands = self.commands.begin_render_pass(framebuffer, false, clear_values).unwrap();
+		self.dynamic_state.viewports = Some(vec![viewport]);
 
 		PassInFrame {
 			frame: self,

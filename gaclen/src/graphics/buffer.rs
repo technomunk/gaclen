@@ -32,7 +32,7 @@ use std::sync::Arc;
 use vulkano::sync::GpuFuture;
 use vulkano::memory::DeviceMemoryAllocError;
 
-pub use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer, CpuBufferPool, ImmutableBuffer};
+pub use vulkano::buffer::{BufferAccess, BufferSlice, BufferUsage, CpuAccessibleBuffer, CpuBufferPool, ImmutableBuffer};
 
 /// Create a device-local immutable buffer from some data.
 /// 

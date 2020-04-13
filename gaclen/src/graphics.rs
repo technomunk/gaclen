@@ -15,7 +15,6 @@ pub mod swapchain;
 /// used for hardware acceleration.
 pub use vulkano;
 pub use vulkano::impl_vertex;
-pub use vulkano::format::Format as PixelFormat;
 pub use vulkano::instance::Version;
 
 const REQUIRED_VULKAN_VERSION: Version = Version { major: 1, minor: 0, patch: 0 };

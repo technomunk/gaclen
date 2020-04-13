@@ -46,3 +46,7 @@ Since the changelog this diary is reserved for personal entries in free form.
 ## 16-02-2020
 
 Greg split the `Device` into smaller modules related to the relevant functionality, such as `swapchain` or `buffer`.
+
+## 13-04-2020
+
+Greg finally fixed the `shadow` example, achieving shadow-mapping in his engine for the first time.

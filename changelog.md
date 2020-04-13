@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.11 Attached Viewports
+
+- **!BREAKING CHANGE!** adds a `viewport` argument to `Frame::begin_pass()` function
+- **!BREAKING CHANGE!** refactors export of `PixelFormat` as `image::Format`
+- adds `Swapchain::default_viewport()` function to ease the transition to the new signature
+- adds `GraphicalPass::create_fixed_size_descriptor_set_pool()`
+- re-exports `image::{AttachmentImage, CompareOp}` from vulkano
+- re-exports `buffer::{BufferAccess, BufferSlice}` from vulkano
+- re-exports `pass::{FixedSizeDescriptorSet, FixedSizeDescriptorSetsPool}` from vulkano
+
 ## 0.0.10 Split Libraries
 
 - **!IMPORTANT!** adds initial support for generic attachments

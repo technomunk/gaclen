@@ -4,11 +4,13 @@
 //! 
 //! Please note, that because of screen-space coordinate mismatch between OpenGL and Vulkan the `up` coordinate is reversed.
 
+// Allow `shader!` macro to use this project's gaclen dependency.
 extern crate gaclen;
 
 mod shaders;
 
 use gaclen::graphics;
+use gaclen::winit;
 
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::event::{Event, WindowEvent};

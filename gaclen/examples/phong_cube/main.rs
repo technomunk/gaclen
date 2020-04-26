@@ -5,12 +5,14 @@
 //! 
 //! Please note, that because of screen-space coordinate mismatch between OpenGL and Vulkan the `up` coordinate and triangle-faces are reversed.
 
+// Allow `shader!` macro to use this project's gaclen dependency.
 extern crate gaclen;
 
 mod shaders;
 mod geometry;
 
 use gaclen::graphics;
+use gaclen::winit;
 
 use cgmath::One;
 

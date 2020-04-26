@@ -1,5 +1,11 @@
 //! Tweaked version of [vulkano_shader!](https://docs.rs/crate/vulkano-shaders) macro.
 //! 
+//! In order to function the macro requires access to gaclen crate:
+//! ```
+//! // Allow `shader!` macro to use this project's gaclen dependency.
+//! extern crate gaclen;
+//! ```
+//! 
 //! The changes include tweaks to the generated code to use gaclen::vulkano to avoid the necessity of including vulkano in gaclen-dependent projects.
 
 #![recursion_limit = "1024"]

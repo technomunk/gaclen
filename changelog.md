@@ -1,10 +1,14 @@
 # Changelog
 
-## 0.0.12 Fixed Dependencies
+## 0.0.13 Fixed Dependencies
 
-- Fixes `gaclen_shader` in external projects.
+- Fixes `gaclen_shader` in external projects
+- Updates `gaclen_shader` crate-level documentation
 - Updates `vulkano` dependency `0.17.0 -> 0.18.0`
 - Updates `winit` dependency `0.21.0` -> `0.22.1`
+- Make examples more copy-pasteable
+
+## 0.0.12 -YANKED-
 
 ## 0.0.11 Attached Viewports
 

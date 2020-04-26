@@ -1,6 +1,6 @@
 [package]
 name = "gaclen_shader"
-version = "0.0.11"
+version = "0.0.12"
 authors = ["Grigory 'Griffone' Glukhov <thegriffones@gmail.com>"]
 edition = "2018"
 

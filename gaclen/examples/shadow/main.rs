@@ -1,9 +1,11 @@
+// Allow `shader!` macro to use this project's gaclen dependency.
 extern crate gaclen;
 
 mod shaders;
 mod geometry;
 
 use gaclen::graphics;
+use gaclen::winit;
 
 use cgmath::{One, Rotation};
 

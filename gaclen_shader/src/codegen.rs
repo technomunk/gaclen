@@ -7,7 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-// The only changes from the crate::gaclen::graphics::vulkano-shaders is using crate::gaclen::graphicscrate::gaclen::graphics::vulkano instead of crate::gaclen::graphics::vulkano in the generated code
+// The only changes from the crate::gaclen::graphics::vulkano-shaders is using crate::gaclen::graphics::vulkano instead of ::vulkano in the generated code
 
 use std::io::Error as IoError;
 use std::path::Path;

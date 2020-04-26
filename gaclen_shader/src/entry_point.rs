@@ -56,7 +56,7 @@ pub fn write_entry_point(doc: &Spirv, instruction: &Instruction) -> (TokenStream
     let (ty, f_call) = {
         if let ExecutionModel::ExecutionModelGLCompute = *execution {
             (
-                quote!{ ::vulkano::pipeline::shader::ComputeEntryPoint<#spec_consts_struct, Layout> },
+                quote!{ crate::gaclen::graphics::vulkano::pipeline::shader::ComputeEntryPoint<#spec_consts_struct, Layout> },
                 quote!{ compute_entry_point(
                     ::std::ffi::CStr::from_ptr(NAME.as_ptr() as *const _),
                     Layout(ShaderStages { compute: true, .. ShaderStages::none() })
@@ -65,13 +65,13 @@ pub fn write_entry_point(doc: &Spirv, instruction: &Instruction) -> (TokenStream
         } else {
             let entry_ty = match *execution {
                 ExecutionModel::ExecutionModelVertex =>
-                    quote!{ ::vulkano::pipeline::shader::GraphicsShaderType::Vertex },
+                    quote!{ crate::gaclen::graphics::vulkano::pipeline::shader::GraphicsShaderType::Vertex },
 
                 ExecutionModel::ExecutionModelTessellationControl =>
-                    quote!{ ::vulkano::pipeline::shader::GraphicsShaderType::TessellationControl },
+                    quote!{ crate::gaclen::graphics::vulkano::pipeline::shader::GraphicsShaderType::TessellationControl },
 
                 ExecutionModel::ExecutionModelTessellationEvaluation =>
-                    quote!{ ::vulkano::pipeline::shader::GraphicsShaderType::TessellationEvaluation },
+                    quote!{ crate::gaclen::graphics::vulkano::pipeline::shader::GraphicsShaderType::TessellationEvaluation },
 
                 ExecutionModel::ExecutionModelGeometry => {
                     let mut execution_mode = None;
@@ -95,14 +95,14 @@ pub fn write_entry_point(doc: &Spirv, instruction: &Instruction) -> (TokenStream
                     }
 
                     quote!{
-                        ::vulkano::pipeline::shader::GraphicsShaderType::Geometry(
-                            ::vulkano::pipeline::shader::GeometryShaderExecutionMode::#execution_mode
+                        crate::gaclen::graphics::vulkano::pipeline::shader::GraphicsShaderType::Geometry(
+                            crate::gaclen::graphics::vulkano::pipeline::shader::GeometryShaderExecutionMode::#execution_mode
                         )
                     }
                 }
 
                 ExecutionModel::ExecutionModelFragment =>
-                    quote!{ ::vulkano::pipeline::shader::GraphicsShaderType::Fragment },
+                    quote!{ crate::gaclen::graphics::vulkano::pipeline::shader::GraphicsShaderType::Fragment },
 
                 ExecutionModel::ExecutionModelGLCompute => unreachable!(),
 
@@ -138,7 +138,7 @@ pub fn write_entry_point(doc: &Spirv, instruction: &Instruction) -> (TokenStream
             let capitalized_ep_name_output = Ident::new(&capitalized_ep_name_output, Span::call_site());
 
             let ty = quote!{
-                ::vulkano::pipeline::shader::GraphicsEntryPoint<
+                crate::gaclen::graphics::vulkano::pipeline::shader::GraphicsEntryPoint<
                     #spec_consts_struct,
                     #capitalized_ep_name_input,
                     #capitalized_ep_name_output,
@@ -274,9 +274,9 @@ fn write_interface_struct(struct_name_str: &str, attributes: &[Element]) -> Toke
                 if self.num == #num {
                     self.num += 1;
 
-                    return Some(::vulkano::pipeline::shader::ShaderInterfaceDefEntry {
+                    return Some(crate::gaclen::graphics::vulkano::pipeline::shader::ShaderInterfaceDefEntry {
                         location: #loc .. #loc_end,
-                        format: ::vulkano::format::Format::#format,
+                        format: crate::gaclen::graphics::vulkano::format::Format::#format,
                         name: Some(::std::borrow::Cow::Borrowed(#name))
                     });
                 }
@@ -297,7 +297,7 @@ fn write_interface_struct(struct_name_str: &str, attributes: &[Element]) -> Toke
         pub struct #struct_name;
 
         #[allow(unsafe_code)]
-        unsafe impl ::vulkano::pipeline::shader::ShaderInterfaceDef for #struct_name {
+        unsafe impl crate::gaclen::graphics::vulkano::pipeline::shader::ShaderInterfaceDef for #struct_name {
             type Iter = #iter_name;
             fn elements(&self) -> #iter_name {
                  #iter_name { num: 0 }
@@ -308,7 +308,7 @@ fn write_interface_struct(struct_name_str: &str, attributes: &[Element]) -> Toke
         pub struct #iter_name { num: u16 }
 
         impl Iterator for #iter_name {
-            type Item = ::vulkano::pipeline::shader::ShaderInterfaceDefEntry;
+            type Item = crate::gaclen::graphics::vulkano::pipeline::shader::ShaderInterfaceDefEntry;
 
             #[inline]
             fn next(&mut self) -> Option<Self::Item> {

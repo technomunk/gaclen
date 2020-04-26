@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.12 Fixed Dependencies
+
+- Fixes `gaclen_shader` in external projects.
+- Updates `vulkano` dependency `0.17.0 -> 0.18.0`
+- Updates `winit` dependency `0.21.0` -> `0.22.1`
+
 ## 0.0.11 Attached Viewports
 
 - **!BREAKING CHANGE!** adds a `viewport` argument to `Frame::begin_pass()` function

@@ -19,6 +19,12 @@ impl GraphicalPass<()> {
 	pub fn start() -> GraphicalPassBuilder<(), (), (), (), ()> { GraphicalPassBuilder::new() }
 }
 
+#[cfg(feature="expose-underlying-vulkano")]
+impl<P: ?Sized> GraphicalPass<P> {
+	#[inline]
+	pub fn pipeline(&self) -> Arc<P> { self.pipeline }
+}
+
 impl<P : ?Sized> GraphicalPass<P>
 {
 	/// Start building a new persistent descriptor set.

@@ -68,7 +68,6 @@ impl Device {
 	pub fn logical_device(&self) -> Arc<LogicalDevice> { self.device.clone() }
 }
 
-// Member exposure
 #[cfg(feature = "expose-underlying-vulkano")]
 impl Device {
 	/// Get the [vulkano device queue](struct.DeviceQueue.html) used for graphical operations.
@@ -206,6 +205,7 @@ fn choose_better_graphics_family<'a>(first: vulkano::instance::QueueFamily<'a>, 
 fn choose_better_transfer_family<'a>(first: vulkano::instance::QueueFamily<'a>, second: vulkano::instance::QueueFamily<'a>) -> vulkano::instance::QueueFamily<'a> {
 	if !second.explicitly_supports_transfers() { return first; };
 
+	// prefer exclusively transfer operations
 	match second.supports_graphics() {
 		true => first,
 		false => match first.supports_graphics() {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.14 Copy Buffers
+
+- Adds device-local buffer creation methods
+- Adds buffer update and copy methods
+- Adds an optional `serde` dependency that should enable winit `serde` features
+
 ## 0.0.13 Fixed Dependencies
 
 - Fixes `gaclen_shader` in external projects

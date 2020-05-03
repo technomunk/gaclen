@@ -19,7 +19,8 @@ default = []
 expose-underlying-vulkano = []
 
 [dependencies]
-winit = "0.22.1" # window handling
+winit = "0.22" # window handling
+serde = { version = "1", optional = true, features = ["serde_derive"] }
 vulkano = "0.18.0" # vulkan library in Rust
 vulkano-win = "0.18.0" # vulkan-winit linkage
 

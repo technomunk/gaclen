@@ -29,10 +29,12 @@ use super::device::Device;
 
 use std::sync::Arc;
 
+use vulkano::buffer::{TypedBufferAccess};
+use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::sync::GpuFuture;
 use vulkano::memory::DeviceMemoryAllocError;
 
-pub use vulkano::buffer::{BufferAccess, BufferSlice, BufferUsage, CpuAccessibleBuffer, CpuBufferPool, ImmutableBuffer};
+pub use vulkano::buffer::{BufferAccess, BufferSlice, BufferUsage, CpuAccessibleBuffer, CpuBufferPool, DeviceLocalBuffer, ImmutableBuffer};
 
 /// Create a device-local immutable buffer from some data.
 /// 
@@ -70,4 +72,67 @@ where
 	future.flush().unwrap();
 
 	Ok(buffer)
+}
+
+/// Create an uninitialized device-local buffer for sized data.
+#[inline]
+pub fn create_device_local_buffer<T>(device: &Device, usage: BufferUsage) -> Result<Arc<DeviceLocalBuffer<T>>, DeviceMemoryAllocError> {
+	DeviceLocalBuffer::new(device.logical_device(), usage, device.device.active_queue_families())
+}
+
+/// Create an uninitialized device-local buffer for an array of data.
+#[inline]
+pub fn create_device_local_array_buffer<T>(device: &Device, len: usize, usage: BufferUsage) -> Result<Arc<DeviceLocalBuffer<[T]>>, DeviceMemoryAllocError> {
+	DeviceLocalBuffer::array(device.logical_device(), len, usage, device.device.active_queue_families())
+}
+
+/// Write data to a buffer.
+/// 
+/// Builds a command buffer for writing the data to the buffer and executes it.
+/// 
+/// # Panic
+/// 
+/// - Panics if fails to create the command buffer.
+/// - Panics if fails to submit the command buffer.
+pub fn update<B, D>(device: &Device, buffer: B, data: D)
+where
+	B : TypedBufferAccess<Content = D> + Send + Sync + 'static,
+	D : Send + Sync + 'static,
+{
+	let command_buffer = AutoCommandBufferBuilder::primary_one_time_submit(device.logical_device(), device.transfer_queue.family()).unwrap()
+		.update_buffer(buffer, data).unwrap()
+		.build().unwrap();
+	
+	vulkano::sync::now(device.logical_device())
+		.then_execute(device.transfer_queue.clone(), command_buffer).unwrap()
+		.flush().unwrap();
+}
+
+/// Copies data from one buffer to another.
+/// 
+/// Builds a command buffer for copying the data and executes it.
+/// 
+/// # Notes
+/// 
+/// - The source buffer should have `BufferUsage::transfer_source` set to true.
+/// - The destination buffer should have `BufferUsage::transfer_destination` set to true.
+/// - If the sizes of buffers are not equal the amount of data copies will be equal to the smaller of the two sizes.
+/// 
+/// # Panic
+/// 
+/// - Panics if fails to create the command buffer.
+/// - Panics if fails to submit the command buffer.
+pub fn copy<S, D, T>(device: &Device, source: S, destination: D)
+where
+	S : TypedBufferAccess<Content = T> + Send + Sync + 'static,
+	D : TypedBufferAccess<Content = T> + Send + Sync + 'static,
+	T : ?Sized,
+{
+	let command_buffer = AutoCommandBufferBuilder::primary_one_time_submit(device.logical_device(), device.transfer_queue.family()).unwrap()
+		.copy_buffer(source, destination).unwrap()
+		.build().unwrap();
+	
+	vulkano::sync::now(device.logical_device())
+		.then_execute(device.transfer_queue.clone(), command_buffer).unwrap()
+		.flush().unwrap();
 }

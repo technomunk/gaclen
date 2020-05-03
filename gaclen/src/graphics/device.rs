@@ -71,19 +71,19 @@ impl Device {
 #[cfg(feature = "expose-underlying-vulkano")]
 impl Device {
 	/// Get the [vulkano device queue](struct.DeviceQueue.html) used for graphical operations.
-	#[inline(always)]
+	#[inline]
 	pub fn graphics_queue(&self) -> &Arc<DeviceQueue> { self.graphics_queue }
 	/// Get the [vulkano device queue](struct.DeviceQueue.html) used for transfer operations.
-	#[inline(always)]
+	#[inline]
 	pub fn transfer_queue(&self) -> &Arc<DeviceQueue> { self.transfer_queue }
 	/// Get the [vulkano device queue](struct.DeviceQueue.html) used for compute operations.
-	#[inline(always)]
+	#[inline]
 	pub fn compute_queue(&self) -> &Arc<DeviceQueue> { self.compute_queue }
 	/// Get the [vulkano swapchian](struct.Swapchain.html) used for presenting images on the screen.
-	#[inline(always)]
+	#[inline]
 	pub fn swapchain(&self) -> &Arc<Swapchain<Arc<Window>>> { self.swapchain }
 	/// Get the [vulkano swapchain images](struct.SwapchainImage.html) that are presented on the screen.
-	#[inline(always)]
+	#[inline]
 	pub fn swapchain_images(&self) -> &Vec<Arc<SwapchainImage<Arc<Window>>>> { self.swapchain_images }
 }
 

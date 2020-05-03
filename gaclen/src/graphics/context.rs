@@ -32,7 +32,7 @@ impl Context {
 #[cfg(feature = "expose-underlying-vulkano")]
 impl Context {
 	/// Get the underlying [vulkano instance](struct.Instance.html).
-	#[inline(always)]
+	#[inline]
 	pub fn instance(&self) -> &Arc<Instance> { self.instance }
 }
 

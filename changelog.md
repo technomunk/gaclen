@@ -2,8 +2,11 @@
 
 ## 0.0.14 Copy Buffers
 
-- Adds device-local buffer creation methods
-- Adds buffer update and copy methods
+- Adds methods for creating `DeviceLocalBuffer`s:
+  - `buffer::create_device_local_buffer()`
+  - `buffer::create_device_local_array_buffer()`
+- Adds `buffer::update()` for updating buffer data
+- Adds `buffer::copy()` for copying data from one buffer to another
 - Adds an optional `serde` dependency that should enable winit `serde` features
 
 ## 0.0.13 Fixed Dependencies
